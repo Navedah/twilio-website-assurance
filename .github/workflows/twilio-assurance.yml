@@ -1,0 +1,149 @@
+name: Twilio Public Website - Kane CLI Assurance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      on_failure:
+        description: "Behaviour when a member fails"
+        type: choice
+        default: continue
+        options:
+          - continue
+          - fail-fast
+      match:
+        description: "Optional regex to select a subset of tests by path"
+        type: string
+        default: ""
+
+concurrency:
+  group: twilio-assurance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  twilio-assurance:
+    name: Run Twilio sales-contact assurance suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+
+      - name: Verify toolchain
+        run: |
+          node --version
+          kane-cli --version
+          google-chrome --version || chromium --version
+
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: |
+          if [ -z "$LT_USERNAME" ] || [ -z "$LT_ACCESS_KEY" ]; then
+            echo "::error::LT_USERNAME and LT_ACCESS_KEY repository secrets are not set."
+            exit 1
+          fi
+          kane-cli login \
+            --username "$LT_USERNAME" \
+            --access-key "$LT_ACCESS_KEY"
+
+      - name: List committed tests
+        run: kane-cli testmd list
+
+      - name: Plan the suite
+        run: kane-cli testrun run --dry-run --headless
+
+      - name: Run Twilio assurance suite
+        env:
+          ON_FAILURE: ${{ inputs.on_failure || 'continue' }}
+          MATCH: ${{ inputs.match }}
+        run: |
+          args=(--headless --on-failure "$ON_FAILURE")
+          if [ -n "$MATCH" ]; then
+            args+=(--match "$MATCH")
+          fi
+          kane-cli testrun run "${args[@]}"
+
+      - name: Show evidence files
+        if: always()
+        run: |
+          echo "Evidence generated under .testmuai/evidence/"
+          find .testmuai/evidence -maxdepth 2 -type f -print 2>/dev/null || true
+
+      - name: Validate evidence packs
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          packs=(.testmuai/evidence/*.evidence)
+
+          if [ ${#packs[@]} -eq 0 ]; then
+            echo "::error::No .evidence pack was generated."
+            exit 1
+          fi
+
+          validation_failed=0
+
+          for pack in "${packs[@]}"; do
+            echo "Validating $pack"
+            kane-cli evidence validate "$pack" --json || validation_failed=1
+          done
+
+          if [ "$validation_failed" -ne 0 ]; then
+            echo "::error::One or more evidence packs failed validation."
+            exit 1
+          fi
+
+      - name: Summarise results
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          results=(.testmuai/tests/output-*/Result.md)
+
+          {
+            echo "## Twilio assurance run"
+            echo
+
+            if [ ${#results[@]} -eq 0 ]; then
+              echo "No \`Result.md\` was produced."
+              exit 0
+            fi
+
+            echo "| Test | Status | Duration |"
+            echo "| --- | --- | --- |"
+
+            for result in "${results[@]}"; do
+              name="$(basename "$(dirname "$result")")"
+              name="${name#output-}"
+              # Read the YAML frontmatter Kane CLI writes at the top of Result.md.
+              status="$(awk -F': *' '/^status:/ { print $2; exit }' "$result")"
+              duration="$(awk -F': *' '/^duration_s:/ { print $2 "s"; exit }' "$result")"
+              echo "| $name | ${status:-unknown} | ${duration:-n/a} |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Kane CLI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kane-cli-evidence
+          path: |
+            .testmuai/evidence/
+            .testmuai/tests/**/Result.md
+            .testmuai/tests/output-*/
+          if-no-files-found: warn
+          retention-days: 14

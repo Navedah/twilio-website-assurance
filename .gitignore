@@ -1,0 +1,18 @@
+# Kane CLI local assurance store — append-only, single-writer, not Git-mergeable
+.context/
+
+# Kane CLI runtime evidence packs
+.testmuai/evidence/
+
+# Local Kane CLI session/config artifacts
+.testmuai/sessions/
+.testmuai/*.log
+
+# Local run outputs (re-created by every execution, uploaded as CI artifacts)
+.testmuai/tests/output-*/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
