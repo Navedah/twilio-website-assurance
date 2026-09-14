@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"Every visible Contact sales control on the public homepage opens the sales contact page.","kind":"presence","risk":"high","derived":true,"expected_answer":{"operator":"forall","operand":"visible Contact sales control opens the sales contact page"}}}

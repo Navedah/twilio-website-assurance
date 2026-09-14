@@ -1,5 +1,12 @@
-# Kane CLI local assurance store — append-only, single-writer, not Git-mergeable
-.context/
+# Kane CLI local assurance store.
+# Intentionally NOT ignored: `kane-cli cover` and `kane-cli maintain` need the
+# live graph, and committing it lets the PRD hash be diffed across commits.
+# It is append-only and single-writer, so never write to it from two places at
+# once; on a conflict, regenerate rather than hand-merge.
+# .context/
+
+# Transient locks and session state inside the store
+.context/locks/
 
 # Kane CLI runtime evidence packs
 .testmuai/evidence/

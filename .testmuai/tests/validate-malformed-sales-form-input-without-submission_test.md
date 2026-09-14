@@ -1,4 +1,10 @@
 ---
+mode: testing
+url: https://www.twilio.com/en-us
+headless: true
+tags: [contact-sales, validation, negative]
+max_steps: 40
+timeout: 300
 assurance:
   id: t-2
   base: sha256:59f3152b0a7f06cedc69cc35bfed27ef8161cd90daed944efbe6eee1881d4338

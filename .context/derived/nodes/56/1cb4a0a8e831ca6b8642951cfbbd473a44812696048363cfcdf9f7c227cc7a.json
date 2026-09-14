@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"The sales form displays inline validation when empty input is triggered.","kind":"presence","risk":"high","derived":true,"expected_answer":{"operator":"exists","operand":"inline validation for empty input on the sales form"}}}

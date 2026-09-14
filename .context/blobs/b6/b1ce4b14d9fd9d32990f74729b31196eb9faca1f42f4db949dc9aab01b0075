@@ -1,0 +1,377 @@
+PRODUCT REQUIREMENTS & TEST SPECIFICATION
+Twilio Public Website
+www.twilio.com/en-us  —  anonymous (logged-out) experience only
+Field	Value
+Application under test	https://www.twilio.com/en-us (English, United States locale)
+Document type	Reverse-engineered PRD with an executable test suite
+Authentication	None. All requirements and test cases execute as an anonymous visitor.
+Environment	Public production site. No test credentials required or used.
+Baseline captured	September 11, 2026
+Owner	[QA Lead — TBD]
+Status	Draft v1.0 — for review
+
+Scope constraint: no account credentials are available for this engagement. Every requirement and every test case in this document is verifiable without logging in. Anything behind authentication is listed in §3.2 as explicitly out of scope and has no test coverage here.
+
+
+1. Purpose
+This document does two jobs. First, it states the requirements the Twilio public website is expected to satisfy, derived by inspecting the live site rather than from an internal specification. Second, it provides a test suite that a tester can execute end to end using nothing but a browser.
+It is written so that each requirement has at least one test case, and each test case traces back to a requirement. Section 12 holds the traceability matrix.
+2. Product Overview
+Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales.
+The homepage itself is a single long-scroll marketing page with a persistent global header. Its content sections are, in order: a hero with dual calls to action, a platform narrative in four parts, a product grid of six cards, a multi-language code sample block, a customer results carousel, an analyst recognition band, a closing conversion band, and a large footer with a sources accordion.
+2.1 Primary visitor types
+Visitor	What they are trying to do	Success action
+Developer evaluator	Confirm the API can do the job and find the documentation quickly	Reaches docs or copies a code sample
+Technical buyer	Compare products, understand the platform, check pricing	Reaches a product or pricing page
+Enterprise buyer	Assess credibility, security posture, and analyst standing	Reaches customer stories or contacts sales
+Existing customer	Get to the console, the help centre, or the status page	Exits to the correct destination
+Job seeker / press / investor	Reach company information	Reaches the relevant footer destination
+3. Scope
+3.1 In scope
+- The English United States homepage and all global chrome rendered on it: utility bar, main navigation, mega menus, search entry point, and footer.
+- All homepage content sections and their interactive behaviour.
+- Link integrity for every outbound link reachable from the homepage, verified to the point of page load only.
+- Locale switching between the six published languages.
+- Responsive behaviour across desktop, tablet, and mobile breakpoints.
+- Accessibility, performance, and SEO characteristics of the homepage.
+- The unauthenticated state of any form reachable from the homepage — field presence, client-side validation, and error messaging — stopping short of submission.
+3.2 Out of scope
+The following are excluded because they require credentials, create an account, or generate commercial contact. No test case in section 9 touches them.
+Excluded area	Reason
+Twilio Console (twilio.com/login) and anything after it	Requires account credentials
+SendGrid and Segment login destinations	Requires account credentials
+Free trial account creation — completing the sign-up at /try-twilio	Creates a real account and requires phone verification
+Contact sales form submission	Generates a real sales lead
+Webinar and gated asset registration	Creates a real registration record
+Newsletter or marketing consent submission	Creates a real subscription
+Any authenticated dashboard, billing, or usage view	Requires account credentials
+Backend API behaviour, message delivery, and telephony functionality	Not part of the website under test
+
+Where a test case reaches a conversion form, the case ends at verifying the form renders and validates correctly. The submit action is never performed.
+
+
+4. Page Inventory
+Destinations reachable from the homepage, grouped as the navigation groups them. Every one of these is publicly accessible.
+4.1 Global chrome
+Element	Destinations
+Language selector	en-us, fr-fr, de-de, ja-jp, pt-br, es-mx
+Support menu	Help Center, Support Plans, Partner Solutions
+Login menu	Console, Segment, SendGrid — presence and link target only; not followed past the login screen
+Header actions	Contact sales, Start for free
+Search	Site search overlay with a privacy notice
+4.2 Navigation groups
+Menu	Sub-groups	Representative destinations
+Products	Twilio Platform, Conversations, Communications, Authentication, Customer Data	Conversation Memory, Conversation Orchestrator, Conversation Intelligence, Conversation Relay, Messaging, SMS, WhatsApp, RCS, Voice, SIP Trunking, Email, SMTP, Phone Numbers, Toll-free, 10DLC, Short Codes, Video, Flex, Verify, Lookup, Connections, Warehouses, Protocols, Unify, Engage, Audiences, Journeys
+Solutions	Use Cases, Teams, Industry, Company Size	Verification and identity, Fraud prevention, Alerts and notifications, Appointment reminders, Mass texting, Marketing and promotions, SMS marketing, Support and sales, Voice AI, IVR, Contact center, Developers, Marketing, Financial services, Healthcare, Retail, Nonprofit, Hospitality, Ecommerce, Public sector, Education, Enterprise, Startup
+Why Twilio	Overview, Differentiators, Company	Why Twilio, Customer stories, One platform, Trust center, Enterprise scale, Global infrastructure, About us, Values, Diversity, Careers, Twilio.org, Investor relations, Press, Events
+Resources	Developers, Learn, Support and services	Documentation, Code Exchange, Developer Hub, Champions, Changelog, Serverless, Blog, Resource Center, Guides, Reports, Webinars, Podcasts, State of Customer Engagement, Help Center, Partners, Professional services, Support plans, Status pages
+Pricing	Overview, Conversations, Communications, Authentication, Customer Data	All pricing, Messaging pricing, SMS pricing, WhatsApp pricing, Voice pricing, SIP Trunking pricing, Email API pricing, Video pricing, Flex pricing, Verify pricing, Lookup pricing, CDP pricing
+5. Functional Requirements
+Requirement identifiers are used by the test cases in section 9 and the traceability matrix in section 12.
+5.1 Global header and navigation
+ID	Requirement	Priority
+FR-NAV-01	The global header is present on page load and remains accessible while scrolling the full length of the homepage.	P0
+FR-NAV-02	The Twilio logo in the header links to the homepage and is present on every page reachable from it.	P0
+FR-NAV-03	Five top-level menus are present: Products, Solutions, Why Twilio, Resources, Pricing.	P0
+FR-NAV-04	Each top-level menu opens a mega menu on hover or click, and closes on outside click, on Escape, and when another menu opens.	P0
+FR-NAV-05	Every link inside every mega menu resolves to a live page returning HTTP 200 with no redirect chain longer than one hop.	P0
+FR-NAV-06	Mega menu contents are fully reachable and operable by keyboard alone, in a logical tab order.	P0
+FR-NAV-07	Both header conversion actions are present at all times: Contact sales and Start for free.	P0
+FR-NAV-08	The utility bar exposes a language selector listing six languages, a Support menu, and a Login menu.	P1
+FR-NAV-09	Selecting a language navigates to the equivalent localised path and the page renders in that language.	P0
+FR-NAV-10	The search control opens a search input and displays the associated data-collection notice with a link to the privacy policy.	P1
+FR-NAV-11	At viewports below the mobile breakpoint the navigation collapses to a toggle, and all menu groups remain reachable as expandable sections.	P0
+FR-NAV-12	Menu items flagged as new carry a visible badge, and promotional slots inside menus render their image, copy, and link.	P2
+5.2 Homepage content
+ID	Requirement	Priority
+FR-HOME-01	The hero renders a headline, a supporting paragraph, and two calls to action, with the primary action leading to the free trial and the secondary to the platform page.	P0
+FR-HOME-02	Three trust indicators appear beneath the hero actions covering trial availability, card requirement, and pricing flexibility.	P1
+FR-HOME-03	The platform narrative section presents four themes — self-service, hand-off, continuity, and memory — each with a heading, description, associated product tags, and an image.	P0
+FR-HOME-04	The product grid renders six cards: Conversations, Messaging, Email, Voice, User authentication, Customer data. Each card has an image, a heading, a description, and a link.	P0
+FR-HOME-05	Product cards show a hover state on pointer devices and remain fully usable without hover on touch devices.	P1
+FR-HOME-06	The code sample block offers seven language tabs — Python, C#, PHP, Ruby, Java, JavaScript, cURL — and swaps the displayed sample without a page reload.	P0
+FR-HOME-07	The selected code sample is syntax-highlighted, horizontally scrollable if it overflows, and selectable as text.	P1
+FR-HOME-08	The customer results carousel presents at least eight customer entries, each with a logo and a quantified result, and is advanceable by control, swipe, and keyboard.	P1
+FR-HOME-09	The analyst recognition band displays three analyst entries, each with a recurrence count and a link to the corresponding report or landing page.	P1
+FR-HOME-10	Every analyst and customer claim carries a numbered reference resolving to an entry in the sources accordion in the footer.	P0
+FR-HOME-11	The sources accordion expands and collapses on activation and is expandable by keyboard.	P2
+FR-HOME-12	The closing conversion band repeats both primary actions, linking to the free trial and the pricing page.	P0
+FR-HOME-13	All homepage images have meaningful alternative text, and decorative images are marked as such.	P0
+FR-HOME-14	Images are served in a modern format with responsive sources, and offscreen images load lazily.	P1
+5.3 Footer
+ID	Requirement	Priority
+FR-FOOT-01	The footer renders four collapsible link groups: Considering Twilio, Products and Features, Use Cases, Developers.	P0
+FR-FOOT-02	Legal and corporate links are present: Careers, Twilio.org, Press, Investor relations, Legal, Privacy, Security, Impressum, Sitemap.	P0
+FR-FOOT-03	Social links open in a new tab with appropriate rel attributes and accessible names.	P1
+FR-FOOT-04	The copyright line displays the current year.	P2
+FR-FOOT-05	The sitemap link resolves to a valid XML sitemap, and the machine-readable llms.txt resolves successfully.	P2
+FR-FOOT-06	Footer accordions default to collapsed on mobile and expanded or expandable on desktop, without trapping focus.	P1
+5.4 Conversion paths (render and validate only)
+ID	Requirement	Priority
+FR-CONV-01	Every Start for free control across the page leads to the free trial sign-up page and that page loads successfully.	P0
+FR-CONV-02	The sign-up page renders its expected fields and displays inline validation for empty, malformed, and disallowed input, without the form being submitted.	P0
+FR-CONV-03	Every Contact sales control leads to the sales contact page, which renders its form fields and validates them client-side.	P0
+FR-CONV-04	Campaign parameters present in the URL are preserved through navigation to the conversion page.	P2
+FR-CONV-05	Login menu entries point at the correct authentication destinations. Verification stops at the login screen rendering.	P1
+6. Non-Functional Requirements
+ID	Area	Requirement
+NFR-01	Performance	Largest Contentful Paint under 2.5 s, Interaction to Next Paint under 200 ms, and Cumulative Layout Shift under 0.1, measured on a throttled mobile profile.
+NFR-02	Performance	The homepage becomes interactive without waiting on carousel or video assets; offscreen media is deferred.
+NFR-03	Accessibility	Conformance with WCAG 2.2 Level AA. No critical or serious violations from an automated scan, plus a manual keyboard and screen-reader pass.
+NFR-04	Accessibility	Visible focus indicator on every interactive element; no keyboard trap in menus, carousels, or accordions.
+NFR-05	Accessibility	Text contrast at least 4.5:1, and large text and interface components at least 3:1.
+NFR-06	Responsive	Correct rendering at 360, 768, 1024, 1440, and 1920 pixels wide, with no horizontal scrolling and no overlapping content.
+NFR-07	Compatibility	Current and previous major versions of Chrome, Firefox, Safari, and Edge, plus Safari on iOS and Chrome on Android.
+NFR-08	SEO	A single H1, a unique title and meta description, a canonical tag, Open Graph and Twitter card metadata, and hreflang alternates for all six locales.
+NFR-09	SEO	No broken internal links, no soft 404s, and a valid robots directive permitting indexing of the homepage.
+NFR-10	Security	Site served over HTTPS with a valid certificate; HTTP requests redirect to HTTPS; security headers present.
+NFR-11	Privacy	Consent mechanism appears where required by the visitor region, and analytics tags respect the recorded choice.
+NFR-12	Reliability	No uncaught JavaScript errors in the console and no failed network requests on a clean page load.
+NFR-13	Localisation	Each locale renders translated content with correct character encoding and no untranslated placeholder strings.
+NFR-14	Analytics	The tag manager container loads and fires a page-view event; conversion controls emit their tracking events.
+7. Test Approach
+7.1 Method
+- Manual exploratory and scripted execution for layout, content, and interaction.
+- Automated link crawling for the link-integrity cases, limited to a depth of one from the homepage.
+- Automated accessibility scanning with axe or an equivalent, followed by a manual keyboard pass, because automated tools catch roughly a third of real issues.
+- Lighthouse and WebPageTest for the performance cases, run three times with the median taken.
+- Browser developer tools for console errors, network failures, and response headers.
+7.2 Test data
+No credentials are used. Form validation cases use synthetic input only, and no form is ever submitted. Suggested invalid inputs: an empty string, a single space, an address missing the at sign, an address with a trailing dot, a 300-character string, a script tag, and a SQL fragment. These exercise client-side validation without creating records.
+7.3 Entry and exit criteria
+Gate	Criteria
+Entry	The site is reachable, the test environment browsers are installed, and the baseline screenshots from the capture date are available.
+Exit	All P0 cases executed with no open critical or high defects; at least 95% of P1 cases executed; all deviations documented.
+7.4 Defect severity
+Severity	Definition	Example
+Critical	A conversion path or the navigation is unusable	Start for free leads to a 404
+High	Major function broken with no workaround	A mega menu will not open on a supported browser
+Medium	Function impaired but a workaround exists	Carousel arrows fail but swipe works
+Low	Cosmetic or content issue	Inconsistent spacing in a footer column
+
+
+8. Test Cases
+Every case below executes as an anonymous visitor. None requires a username, a password, or an account. Cases that reach a form stop at validation and never submit.
+8.1 Global navigation
+Test ID	Req ID	Steps	Expected result	Pri
+TC-NAV-001	FR-NAV-01	Open the homepage. Scroll to the bottom of the page.	Header remains available throughout; no content is obscured by it.	P0
+TC-NAV-002	FR-NAV-02	Navigate to any product page, then click the Twilio logo.	The homepage loads at the en-us URL.	P0
+TC-NAV-003	FR-NAV-03	Inspect the header.	Exactly five menus are present, correctly labelled and in the documented order.	P0
+TC-NAV-004	FR-NAV-04	Hover the Products menu, then move the pointer away.	The mega menu opens on hover and closes when the pointer leaves.	P0
+TC-NAV-005	FR-NAV-04	Open Products, then click anywhere outside the menu.	The menu closes and the page beneath is not navigated.	P0
+TC-NAV-006	FR-NAV-04	Open Products, then press Escape.	The menu closes and focus returns to the Products trigger.	P0
+TC-NAV-007	FR-NAV-04	Open Products, then hover Solutions.	Products closes and Solutions opens; only one menu is open at a time.	P1
+TC-NAV-008	FR-NAV-05	Open the Products menu and click each link in the Conversations group in turn.	Each destination returns 200 and renders the expected product page.	P0
+TC-NAV-009	FR-NAV-05	Repeat for Communications, Authentication, and Customer Data groups.	All destinations load; no 404, no redirect loop.	P0
+TC-NAV-010	FR-NAV-05	Crawl all Solutions menu links.	All use case, team, industry, and company-size pages load successfully.	P0
+TC-NAV-011	FR-NAV-05	Crawl all Why Twilio menu links, including external subdomains.	Customer stories, trust center, investor relations, and careers all resolve.	P1
+TC-NAV-012	FR-NAV-05	Crawl all Resources menu links including the three status pages.	Docs, blog, resource center, help center, and status pages all resolve.	P1
+TC-NAV-013	FR-NAV-05	Crawl all Pricing menu links, including the four anchor links on the Conversations pricing page.	Each page loads and each anchor scrolls to the correct section.	P0
+TC-NAV-014	FR-NAV-06	From the page top, press Tab repeatedly through the header.	Focus moves in a logical order; every menu can be opened with Enter or Space.	P0
+TC-NAV-015	FR-NAV-06	Open a mega menu by keyboard and tab through its contents.	All links are reachable; focus is not trapped; Shift+Tab exits backwards.	P0
+TC-NAV-016	FR-NAV-07	Inspect the header at each breakpoint.	Contact sales and Start for free are both present and tappable.	P0
+TC-NAV-017	FR-NAV-08	Open the language selector.	Six languages are listed and the current language is marked as selected.	P1
+TC-NAV-018	FR-NAV-09	Select German.	The de-de homepage loads with translated content and no untranslated strings.	P0
+TC-NAV-019	FR-NAV-09	Repeat for French, Japanese, Portuguese, and Spanish.	Each locale loads with correct content and character rendering.	P1
+TC-NAV-020	FR-NAV-08	Open the Support menu.	Help Center, Support Plans, and Partner Solutions are listed and resolve.	P1
+TC-NAV-021	FR-NAV-10	Activate the search control.	A search input opens with the data-collection notice and a working privacy policy link.	P1
+TC-NAV-022	FR-NAV-10	Type a term into search and observe.	Input accepts text and suggestions or a results route is offered; no console error.	P2
+TC-NAV-023	FR-NAV-11	Resize to 360 px and open the navigation toggle.	A full-height menu opens with all five groups as expandable sections.	P0
+TC-NAV-024	FR-NAV-11	On mobile, expand and collapse each group.	Each group toggles independently; the page behind does not scroll while open.	P0
+TC-NAV-025	FR-NAV-12	Inspect the Products menu for badged items.	Items marked as new display the badge; the platform promo slot renders image, copy, and link.	P2
+8.2 Hero and platform narrative
+Test ID	Req ID	Steps	Expected result	Pri
+TC-HERO-001	FR-HOME-01	Load the homepage and inspect the hero.	Headline, supporting paragraph, and two calls to action render above the fold on desktop.	P0
+TC-HERO-002	FR-HOME-01	Compare the hero headline against the captured baseline.	Headline matches the published wording: "The platform for conversations in the AI era".	P1
+TC-HERO-003	FR-HOME-01	Click the primary hero action.	The free trial sign-up page loads. Do not complete sign-up.	P0
+TC-HERO-004	FR-HOME-01	Return and click the secondary hero action.	The customer engagement platform page loads.	P0
+TC-HERO-005	FR-HOME-02	Inspect the area beneath the hero actions.	Three trust indicators are visible covering trial, card requirement, and pricing.	P1
+TC-HERO-006	FR-HOME-13	Inspect the hero image markup.	The image has descriptive alternative text and a responsive source set.	P0
+TC-PLAT-001	FR-HOME-03	Scroll to the platform narrative section.	Four themes render in order, each with heading, description, product tags, and image.	P0
+TC-PLAT-002	FR-HOME-03	Inspect the product tags under each theme.	Tags match the documented product list for that theme and are legible at all breakpoints.	P1
+TC-PLAT-003	FR-HOME-03	Scroll the section slowly and watch for movement.	Any scroll-linked animation completes without layout shift or flicker.	P1
+TC-PLAT-004	FR-HOME-03	Enable the reduced-motion system setting and reload.	Non-essential animation is suppressed and all content remains readable.	P1
+TC-PLAT-005	FR-HOME-03	Click the platform section link.	The customer engagement platform page loads.	P1
+8.3 Product grid
+Test ID	Req ID	Steps	Expected result	Pri
+TC-PROD-001	FR-HOME-04	Scroll to the product grid and count the cards.	Six cards render: Conversations, Messaging, Email, Voice, User authentication, Customer data.	P0
+TC-PROD-002	FR-HOME-04	Inspect each card.	Each has an image, a heading, a description, and an action link.	P0
+TC-PROD-003	FR-HOME-04	Click each card link in turn.	Each leads to its documented destination and returns 200.	P0
+TC-PROD-004	FR-HOME-05	Hover each card on a desktop pointer device.	The hover image or state renders without flicker and reverts on pointer out.	P1
+TC-PROD-005	FR-HOME-05	Repeat on a touch device.	Cards are fully usable with a single tap; no content is hidden behind a hover-only state.	P1
+TC-PROD-006	FR-HOME-04	Tab through the grid.	Each card link receives visible focus in reading order.	P0
+TC-PROD-007	FR-HOME-04	Resize to 768 px and 360 px.	The grid reflows without clipping, overlap, or horizontal scroll.	P0
+TC-PROD-008	FR-HOME-04	Click the view all products link.	The full product index page loads.	P1
+8.4 Code sample block
+Test ID	Req ID	Steps	Expected result	Pri
+TC-CODE-001	FR-HOME-06	Scroll to the code sample block.	Seven language tabs render and one is selected by default.	P0
+TC-CODE-002	FR-HOME-06	Click each tab in turn.	The sample swaps to the matching language with no page reload and no flash of empty content.	P0
+TC-CODE-003	FR-HOME-06	Inspect each sample for correctness.	Each shows a send-message example in idiomatic syntax for that language.	P1
+TC-CODE-004	FR-HOME-07	Select the text of a sample and copy it.	Text selects cleanly; copied text preserves line breaks and indentation.	P1
+TC-CODE-005	FR-HOME-07	View the block at 360 px.	Long lines scroll horizontally within the block only; the page does not scroll sideways.	P0
+TC-CODE-006	FR-HOME-06	Operate the tabs by keyboard using arrow keys and Enter.	Tabs follow the expected tab-pattern semantics and the panel updates.	P1
+TC-CODE-007	FR-HOME-06	Click the view docs link.	The documentation site loads.	P0
+TC-CODE-008	FR-HOME-07	Inspect the rendered sample with a screen reader.	The code block is announced as a code region and is not read character by character.	P2
+8.5 Customer results and analyst band
+Test ID	Req ID	Steps	Expected result	Pri
+TC-CUST-001	FR-HOME-08	Scroll to the customer results carousel.	At least eight entries are present, each with a logo and a quantified result.	P1
+TC-CUST-002	FR-HOME-08	Advance the carousel with its control.	The next entry displays; the transition completes without clipping.	P1
+TC-CUST-003	FR-HOME-08	Advance to the last entry and continue.	Behaviour at the boundary is consistent — either it loops or the control disables.	P1
+TC-CUST-004	FR-HOME-08	Swipe the carousel on a touch device.	Swipe advances one entry and does not scroll the page vertically.	P1
+TC-CUST-005	FR-HOME-08	Operate the carousel by keyboard.	Controls are focusable and operable; the live region announces the change.	P1
+TC-CUST-006	FR-HOME-13	Inspect each customer logo image.	Each has alternative text naming the company.	P0
+TC-CUST-007	FR-HOME-08	Click the customer stories link.	The customer stories site loads.	P1
+TC-ANLY-001	FR-HOME-09	Scroll to the analyst recognition band.	Three analyst entries render, each with a recurrence count and a link.	P1
+TC-ANLY-002	FR-HOME-09	Click each analyst link.	Each report or landing page loads; external links open as documented.	P1
+TC-ANLY-003	FR-HOME-10	Trace each numbered reference marker.	Each resolves to a matching entry in the footer sources accordion.	P0
+TC-ANLY-004	FR-HOME-11	Expand and collapse the sources accordion.	It toggles on click and on Enter, and the expanded state is announced.	P2
+TC-ANLY-005	FR-HOME-10	Read the source entries against the claims.	Every claim in the band has a dated, attributed source entry.	P1
+8.6 Closing band and footer
+Test ID	Req ID	Steps	Expected result	Pri
+TC-CTA-001	FR-HOME-12	Scroll to the closing conversion band.	Both actions render: start free and view pricing.	P0
+TC-CTA-002	FR-CONV-01	Click the closing start-free action.	The free trial page loads. Do not complete sign-up.	P0
+TC-CTA-003	FR-HOME-12	Click the view pricing action.	The pricing overview page loads.	P0
+TC-FOOT-001	FR-FOOT-01	Scroll to the footer.	Four link groups render with the documented headings.	P0
+TC-FOOT-002	FR-FOOT-01	Expand each group on mobile.	Each accordion toggles independently and reveals its links.	P1
+TC-FOOT-003	FR-FOOT-01	Click every link in the Considering Twilio group.	All destinations return 200.	P1
+TC-FOOT-004	FR-FOOT-01	Click every link in the Products and Features, Use Cases, and Developers groups.	All destinations return 200.	P1
+TC-FOOT-005	FR-FOOT-02	Click each legal and corporate link.	Terms, privacy, security, impressum, press, investors, and careers all load.	P0
+TC-FOOT-006	FR-FOOT-03	Click each social link.	Each opens the correct profile in a new tab with a secure rel attribute.	P1
+TC-FOOT-007	FR-FOOT-04	Read the copyright line.	It shows the current year.	P2
+TC-FOOT-008	FR-FOOT-05	Open the sitemap link and the llms.txt link.	The sitemap returns valid XML; llms.txt returns plain text.	P2
+TC-FOOT-009	FR-FOOT-06	Tab through the entire footer.	Focus order is logical and no accordion traps focus.	P1
+TC-FOOT-010	FR-FOOT-01	Inspect the AI summary links in the footer area.	Each link is correctly formed and opens the intended external destination.	P2
+8.7 Conversion paths — render and validate only
+No case in this group submits a form or creates an account.
+Test ID	Req ID	Steps	Expected result	Pri
+TC-CONV-001	FR-CONV-01	Click every start-free control on the page in turn — header, hero, closing band.	All lead to the same free trial page and it loads successfully.	P0
+TC-CONV-002	FR-CONV-02	On the sign-up page, inspect the rendered form.	All expected fields, labels, and the consent text render with correct associations.	P0
+TC-CONV-003	FR-CONV-02	Focus and blur each field leaving it empty.	A required-field message appears for each, and the submit control stays disabled or blocks.	P0
+TC-CONV-004	FR-CONV-02	Enter an address with no at sign and blur.	An invalid-format message appears.	P0
+TC-CONV-005	FR-CONV-02	Enter a 300-character string in a text field.	Input is truncated or rejected with a length message; the layout does not break.	P1
+TC-CONV-006	FR-CONV-02	Enter a script tag and a SQL fragment into a text field.	Input is treated as literal text; nothing executes and no error is thrown.	P0
+TC-CONV-007	FR-CONV-02	Enter a single space in a required field.	Whitespace is not accepted as valid input.	P1
+TC-CONV-008	FR-CONV-02	Navigate away without submitting.	No account is created and no confirmation is sent.	P0
+TC-CONV-009	FR-CONV-03	Click a contact sales control.	The sales contact page loads and renders its form fields.	P0
+TC-CONV-010	FR-CONV-03	Trigger validation on the sales form with empty and malformed input.	Inline validation appears for each field; the form is not submitted.	P0
+TC-CONV-011	FR-CONV-04	Load the homepage with campaign parameters appended, then click start free.	Parameters are preserved on the destination URL.	P2
+TC-CONV-012	FR-CONV-05	Open the Login menu and inspect the three entries.	Console, Segment, and SendGrid entries point at their correct hosts.	P1
+TC-CONV-013	FR-CONV-05	Click the Console entry.	The login screen renders over HTTPS. Stop here — do not attempt to authenticate.	P1
+8.8 Responsive and cross-browser
+Test ID	Req ID	Steps	Expected result	Pri
+TC-RESP-001	NFR-06	Load the homepage at 1920 px.	Content is centred within the maximum width; no stretched or blurred images.	P0
+TC-RESP-002	NFR-06	Load at 1440 px and 1024 px.	All sections reflow correctly with no overlap.	P0
+TC-RESP-003	NFR-06	Load at 768 px.	Navigation collapses at the documented breakpoint; grids reflow to fewer columns.	P0
+TC-RESP-004	NFR-06	Load at 360 px.	No horizontal scrollbar; tap targets are at least 24 by 24 CSS pixels.	P0
+TC-RESP-005	NFR-06	Rotate a mobile device from portrait to landscape.	Layout reflows without content loss or duplicated headers.	P1
+TC-RESP-006	NFR-06	Set browser zoom to 200%.	Content remains readable and operable with no loss of function.	P1
+TC-COMP-001	NFR-07	Execute the P0 set on current Chrome.	All pass.	P0
+TC-COMP-002	NFR-07	Execute the P0 set on current Firefox.	All pass.	P0
+TC-COMP-003	NFR-07	Execute the P0 set on current Safari.	All pass, with particular attention to carousel and sticky header behaviour.	P0
+TC-COMP-004	NFR-07	Execute the P0 set on current Edge.	All pass.	P1
+TC-COMP-005	NFR-07	Execute the navigation and grid cases on iOS Safari.	All pass; no hover-dependent content is unreachable.	P0
+TC-COMP-006	NFR-07	Execute the navigation and grid cases on Android Chrome.	All pass.	P0
+8.9 Accessibility
+Test ID	Req ID	Steps	Expected result	Pri
+TC-A11Y-001	NFR-03	Run an automated accessibility scan on the homepage.	Zero critical and zero serious violations.	P0
+TC-A11Y-002	NFR-04	Traverse the entire page using only the keyboard.	Every interactive element is reachable and operable; no trap anywhere.	P0
+TC-A11Y-003	NFR-04	Observe focus while tabbing.	A visible focus indicator appears on every element, including against imagery.	P0
+TC-A11Y-004	NFR-03	Check for a skip-to-content mechanism.	A skip link is present and moves focus to the main region.	P1
+TC-A11Y-005	NFR-05	Sample text and interface contrast across all sections.	Text meets 4.5:1; large text and components meet 3:1.	P0
+TC-A11Y-006	FR-HOME-13	Audit every image on the page.	Meaningful images have descriptive alternative text; decorative images are hidden from assistive technology.	P0
+TC-A11Y-007	NFR-03	Inspect the heading outline.	Exactly one H1, and heading levels descend without skipping.	P0
+TC-A11Y-008	NFR-03	Navigate the page with a screen reader by landmark.	Banner, navigation, main, and contentinfo landmarks are present and correctly labelled.	P1
+TC-A11Y-009	NFR-03	Inspect menu and accordion markup.	Expanded state, controls relationship, and roles are exposed correctly.	P1
+TC-A11Y-010	NFR-03	Check link text in isolation.	No link relies on surrounding context alone to convey its destination.	P1
+TC-A11Y-011	NFR-03	Enable reduced motion and reload.	Autoplaying and scroll-linked motion is reduced or removed.	P1
+TC-A11Y-012	NFR-03	Test with a 400% zoom on a 1280 px viewport.	Reflows to a single column with no loss of content or function.	P1
+8.10 Performance, SEO, security, and analytics
+Test ID	Req ID	Steps	Expected result	Pri
+TC-PERF-001	NFR-01	Run Lighthouse mobile three times and take the median.	LCP under 2.5 s, CLS under 0.1, INP under 200 ms.	P0
+TC-PERF-002	NFR-01	Run Lighthouse desktop.	Performance score meets the agreed threshold.	P1
+TC-PERF-003	NFR-02	Load on a throttled slow connection.	Hero content renders and is interactive before media finishes loading.	P1
+TC-PERF-004	NFR-02	Inspect network requests on first paint.	Offscreen images are deferred; images are served in a modern format.	P1
+TC-PERF-005	NFR-01	Watch the page during load for movement.	No visible content jump as images and fonts resolve.	P0
+TC-SEO-001	NFR-08	Inspect the document head.	Title, meta description, and canonical are present and correct.	P0
+TC-SEO-002	NFR-08	Inspect Open Graph and Twitter card tags.	Title, description, image, and URL are present for both.	P1
+TC-SEO-003	NFR-08	Inspect hreflang alternates.	All six locales are declared and each resolves.	P1
+TC-SEO-004	NFR-08	Inspect the heading structure and robots directive.	A single H1 and an indexable robots value.	P0
+TC-SEO-005	NFR-09	Crawl all internal links to depth one.	No 404, no soft 404, no redirect chains longer than one hop.	P0
+TC-SEO-006	NFR-09	Validate structured data if present.	No errors reported by a structured data validator.	P2
+TC-SEC-001	NFR-10	Request the site over plain HTTP.	Redirects to HTTPS with a valid certificate and a strict transport header.	P0
+TC-SEC-002	NFR-10	Inspect response headers.	Content type options, frame options or frame ancestors, and referrer policy are present.	P1
+TC-SEC-003	NFR-10	Check for mixed content warnings.	No insecure subresources are loaded.	P0
+TC-PRIV-001	NFR-11	Load the site from an EU region or with an EU profile.	A consent mechanism appears with a genuine reject option.	P0
+TC-PRIV-002	NFR-11	Reject non-essential cookies and inspect network calls.	Non-essential tags do not fire and the choice persists across pages.	P0
+TC-ANA-001	NFR-14	Inspect the network log on a clean load.	The tag manager container loads and a page-view event fires.	P1
+TC-ANA-002	NFR-14	Click a conversion control and observe the data layer.	The expected tracking event is pushed with the documented attributes.	P2
+TC-REL-001	NFR-12	Load the page and read the browser console.	No uncaught JavaScript errors.	P0
+TC-REL-002	NFR-12	Inspect the network log for failures.	No 4xx or 5xx responses for page subresources.	P0
+TC-REL-003	NFR-12	Reload the page with the browser cache disabled.	The page renders identically; no dependency on cached state.	P1
+8.11 Negative and edge cases
+Test ID	Req ID	Steps	Expected result	Pri
+TC-EDGE-001	NFR-09	Request a non-existent path under the en-us directory.	A branded 404 page renders with working navigation, not a server error.	P0
+TC-EDGE-002	NFR-13	Request the homepage with a malformed locale segment.	The site redirects to a valid locale or serves the 404 page gracefully.	P1
+TC-EDGE-003	FR-NAV-05	Append a long query string to the homepage URL.	The page renders normally and the parameters do not break layout.	P2
+TC-EDGE-004	NFR-12	Disable JavaScript and load the homepage.	Core content and navigation links remain readable and followable.	P1
+TC-EDGE-005	NFR-12	Block third-party domains and load the page.	The page still renders; failures are contained to the blocked features.	P2
+TC-EDGE-006	NFR-06	Load with a browser default font size of 24 px.	Layout accommodates larger text without clipping.	P1
+TC-EDGE-007	NFR-12	Interrupt the connection midway through load, then restore it.	The page recovers or fails visibly rather than hanging on a blank screen.	P2
+TC-EDGE-008	FR-NAV-04	Open and close a mega menu rapidly several times.	No stuck open state, no duplicated panels, no console error.	P1
+TC-EDGE-009	FR-HOME-08	Interact with the carousel while a transition is still running.	Input is queued or ignored cleanly; no broken intermediate state.	P1
+TC-EDGE-010	FR-NAV-09	Switch language from a deep product page.	Lands on the equivalent localised page, or the localised homepage if no equivalent exists.	P1
+TC-EDGE-011	NFR-12	Use browser back and forward across five navigations.	History behaves correctly and no stale content is shown.	P1
+TC-EDGE-012	NFR-10	Open the site in a private window with no prior state.	Page renders identically to a cold first visit.	P2
+
+
+9. Coverage Summary
+Group	Cases	P0	Depends on login
+Global navigation	25	13	No
+Hero and platform narrative	11	4	No
+Product grid	8	5	No
+Code sample block	8	3	No
+Customer results and analyst band	12	2	No
+Closing band and footer	13	4	No
+Conversion paths (render and validate only)	13	8	No
+Responsive and cross-browser	12	8	No
+Accessibility	12	6	No
+Performance, SEO, security, analytics	21	11	No
+Negative and edge cases	12	1	No
+Total	147	65	None
+10. Traceability
+Requirement	Covered by
+FR-NAV-01 to FR-NAV-12	TC-NAV-001 to TC-NAV-025, TC-EDGE-008, TC-EDGE-010
+FR-HOME-01 to FR-HOME-02	TC-HERO-001 to TC-HERO-006
+FR-HOME-03	TC-PLAT-001 to TC-PLAT-005
+FR-HOME-04 to FR-HOME-05	TC-PROD-001 to TC-PROD-008
+FR-HOME-06 to FR-HOME-07	TC-CODE-001 to TC-CODE-008
+FR-HOME-08	TC-CUST-001 to TC-CUST-007, TC-EDGE-009
+FR-HOME-09 to FR-HOME-11	TC-ANLY-001 to TC-ANLY-005
+FR-HOME-12	TC-CTA-001 to TC-CTA-003
+FR-HOME-13 to FR-HOME-14	TC-HERO-006, TC-CUST-006, TC-A11Y-006, TC-PERF-004
+FR-FOOT-01 to FR-FOOT-06	TC-FOOT-001 to TC-FOOT-010
+FR-CONV-01 to FR-CONV-05	TC-CONV-001 to TC-CONV-013
+NFR-01 to NFR-02	TC-PERF-001 to TC-PERF-005
+NFR-03 to NFR-05	TC-A11Y-001 to TC-A11Y-012
+NFR-06 to NFR-07	TC-RESP-001 to TC-RESP-006, TC-COMP-001 to TC-COMP-006, TC-EDGE-006
+NFR-08 to NFR-09	TC-SEO-001 to TC-SEO-006, TC-EDGE-001, TC-EDGE-002
+NFR-10	TC-SEC-001 to TC-SEC-003, TC-EDGE-012
+NFR-11	TC-PRIV-001, TC-PRIV-002
+NFR-12	TC-REL-001 to TC-REL-003, TC-EDGE-004, TC-EDGE-005, TC-EDGE-007, TC-EDGE-011
+NFR-13	TC-NAV-018, TC-NAV-019, TC-EDGE-002
+NFR-14	TC-ANA-001, TC-ANA-002
+11. Assumptions and Risks
+- The site is a live production property owned by a third party. Content and layout can change without notice, so any content-matching case should be re-baselined before a regression run.
+- Marketing sites commonly run A/B tests. A tester may see a variant that differs from the captured baseline; treat a difference as a possible experiment before raising a defect.
+- Geolocation affects the consent banner and some pricing content. Record the test location with each result.
+- Link-integrity crawling should be rate-limited to avoid being treated as abusive traffic.
+- Because no account exists, roughly the entire authenticated product surface is untested. If console coverage is later required, a separate specification and a test account will be needed.
+12. Open Questions
+#	Question	Owner
+1	Is the browser support matrix in NFR-07 correct, or is there a published list to align to?	QA Lead
+2	What Lighthouse performance score is the agreed pass threshold?	QA Lead
+3	Should coverage extend beyond the homepage to product and pricing pages in this cycle?	Product
+4	Is a test account likely to become available? If so, a console test specification should be scheduled.	Product
+5	Which analytics events are documented well enough to assert against in TC-ANA-002?	Marketing Ops
+[footer]
+PRD & Test Specification — Twilio Public Website (no-login scope)   |   Page  of 

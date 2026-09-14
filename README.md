@@ -43,7 +43,8 @@ a single space, an address missing the at sign, and an address with a trailing d
 twilio-website-assurance/
 ├── .github/
 │   └── workflows/
-│       └── twilio-assurance.yml
+│       ├── twilio-assurance.yml      ← execution + coverage
+│       └── requirements-drift.yml    ← maintain, plan-only
 ├── requirements/
 │   ├── PRD-Twilio-Website-and-Test-Cases.docx   ← ingested source of record
 │   └── twilio-requirements.md                   ← requirement slice + traceability
@@ -52,15 +53,25 @@ twilio-website-assurance/
 │       ├── reach-the-sales-contact-form-from-every-visible-homepage_test.md
 │       ├── validate-empty-required-sales-form-input-without-submission_test.md
 │       └── validate-malformed-sales-form-input-without-submission_test.md
+├── .context/                             ← assurance graph (committed, see below)
 ├── .gitignore
 └── README.md
 ```
 
-### Why `.context/` is not committed
+### Why `.context/` *is* committed
 
-The Kane CLI assurance store under `.context/` is append-only and single-writer. It is not a
-Git-mergeable artifact, so it stays out of version control. The design phase happens on a
-workstation; what gets committed is the **reviewed output** of that phase — the `_test.md`
+The Kane CLI assurance store under `.context/` is append-only and single-writer, so it is not
+a Git-mergeable artifact. It is committed anyway, deliberately, because two capabilities need
+the live graph and are worth more than the merge risk:
+
+- `kane-cli cover` measures completeness against the graph — without it there is no coverage
+  axis, only a pass/fail list.
+- `kane-cli maintain reconcile` diffs a changed PRD against the graph to show suite drift.
+
+The rule that follows: **never write to `.context/` from two places at once**, and on a
+conflict regenerate rather than hand-merge. CI only ever reads it.
+
+What still gets committed from the design phase is its **reviewed output** — the `_test.md`
 files and the requirement documents.
 
 Each committed test carries an `assurance:` frontmatter block naming its graph id and the
@@ -203,6 +214,13 @@ kane-cli testrun run --headless --on-failure continue
 
 A batch `testrun` produces one sealed evidence pack for the whole suite.
 
+Filter by tag instead of path — every test carries `contact-sales`, plus `smoke`/`happy-path`
+or `validation`/`negative`:
+
+```bash
+kane-cli testrun run --headless --tags validation
+```
+
 ## Phase 3 — Inspect evidence
 
 After a run, look under `.testmuai/evidence/`:
@@ -214,6 +232,18 @@ kane-cli evidence serve .testmuai/evidence/<execution-id>.evidence
 
 The pack contains the test definitions, results, screenshots, console and network logs and
 failure information. Per-test reports land in `.testmuai/tests/output-*/Result.md`.
+
+Merge several packs into one:
+
+```bash
+kane-cli evidence merge .testmuai/evidence/*.evidence --run-id local-1 --out merged.evidence
+```
+
+Then measure coverage against the committed graph:
+
+```bash
+kane-cli cover --from merged.evidence
+```
 
 Do not commit `.testmuai/evidence/`.
 
@@ -228,17 +258,69 @@ Create these repository secrets under **Settings → Secrets and variables → A
 
 The workflow fails fast with a clear error if either is missing.
 
-[`.github/workflows/twilio-assurance.yml`](.github/workflows/twilio-assurance.yml) runs on
-every pull request, on pushes to `main`, and on manual dispatch. It:
+### Test Manager destination
 
-1. Checks out the repository and installs Node.js 20.
+`kane-cli testrun run` seals evidence locally but reports `upload: skipped` — **on its own it
+publishes nothing to Test Manager**. Test cases appear in Test Manager because the workflow
+runs `kane-cli testmd run` per member first, which authors, replays and publishes each case.
+
+To control where those cases land, set two **repository variables** (Settings → Secrets and
+variables → Actions → *Variables*, not Secrets — these are ids, not credentials):
+
+| Variable | Meaning |
+| --- | --- |
+| `KANE_PROJECT_ID` | Test Manager project id. Blank = account default. |
+| `KANE_FOLDER_ID` | Folder id within that project. Blank = account default. |
+
+Find them locally with `kane-cli config show`. The workflow sets them with
+`kane-cli config project <id>` / `kane-cli config folder <id>`.
+
+Set `publish_to_test_manager: false` on a manual dispatch to skip publishing and only produce
+local evidence.
+
+### The execution workflow
+
+[`.github/workflows/twilio-assurance.yml`](.github/workflows/twilio-assurance.yml) runs on
+every pull request, on pushes to `main`, and on manual dispatch. It is also callable from
+another repository via `workflow_call`. It:
+
+1. Checks out the repository and installs Node.js 20, with the npm cache restored.
 2. Installs Kane CLI and verifies the toolchain, including Chrome.
 3. Logs into TestMu AI using the GitHub Secrets.
-4. Lists and plans the committed suite (`--dry-run`) before executing anything.
-5. Runs the suite headless.
-6. Validates every generated evidence pack.
-7. Writes a per-test status table to the job summary.
-8. Uploads evidence, `Result.md` files and test outputs as artifacts, retained 14 days.
+4. Points Kane at the configured Test Manager project and folder.
+5. Lists and plans the committed suite (`--dry-run`) before executing anything.
+6. Publishes and replays each test with `testmd run`, collecting Test Manager links.
+7. Runs the whole suite headless as one sealed `testrun`.
+8. Validates every generated evidence pack.
+9. Merges the packs into one sealed pack for the run.
+10. Produces a two-axis **coverage** report with `kane-cli cover --from`.
+11. Writes execution, coverage and Test Manager tables to the job summary.
+12. Uploads evidence, reports, coverage and outputs as artifacts, retained 30 days.
+
+Steps 8–11 run under `if: always()`, so a failing suite still yields evidence and coverage.
+
+### Coverage
+
+`kane-cli cover` reports two axes, and the job summary renders both:
+
+- **Depth** — of the acceptance criteria the graph knows about, which were actually proven by
+  this evidence pack.
+- **Completeness** — what the graph still owes: use cases with no scenario, criteria with no
+  test. This is how the nine undesigned use cases stay visible instead of being forgotten.
+
+### Requirement drift
+
+[`.github/workflows/requirements-drift.yml`](.github/workflows/requirements-drift.yml) runs
+when anything under `requirements/` changes on a pull request. It runs
+`kane-cli maintain reconcile --plan`, which lands the head move and **stages** every proposed
+suite change without committing any of it, then posts the diff to the job summary.
+
+Nothing in CI promotes a change to trusted. Approving the staged plan is a human action on a
+workstation:
+
+```bash
+kane-cli maintain reconcile --apply
+```
 
 ### Manual dispatch inputs
 

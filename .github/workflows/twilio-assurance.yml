@@ -1,5 +1,9 @@
 name: Twilio Public Website - Kane CLI Assurance
 
+# Execution phase only. The design phase (ingest -> extract -> review -> design)
+# is performed by a human on a workstation and its reviewed output is committed.
+# See README.md for why that split is deliberate.
+
 on:
   pull_request:
   push:
@@ -18,16 +22,56 @@ on:
         description: "Optional regex to select a subset of tests by path"
         type: string
         default: ""
+      tags:
+        description: "Optional comma-separated tag filter (ANY-match)"
+        type: string
+        default: ""
+      start_url:
+        description: "Override the default start URL"
+        type: string
+        default: ""
+      publish_to_test_manager:
+        description: "Publish each test case to LambdaTest Test Manager"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      on_failure:
+        type: string
+        default: continue
+      match:
+        type: string
+        default: ""
+      tags:
+        type: string
+        default: ""
+      start_url:
+        type: string
+        default: ""
+      publish_to_test_manager:
+        type: boolean
+        default: true
+    secrets:
+      LT_USERNAME:
+        required: true
+      LT_ACCESS_KEY:
+        required: true
 
 concurrency:
   group: twilio-assurance-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Where test cases land in Test Manager. Blank = account default.
+  # Set these as repository variables (Settings > Secrets and variables > Actions > Variables).
+  KANE_PROJECT_ID: ${{ vars.KANE_PROJECT_ID }}
+  KANE_FOLDER_ID: ${{ vars.KANE_FOLDER_ID }}
+
 jobs:
   twilio-assurance:
     name: Run Twilio sales-contact assurance suite
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -37,6 +81,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      # Avoids re-downloading kane-cli on every fresh runner.
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
 
       - name: Install Kane CLI
         run: npm install -g @testmuai/kane-cli
@@ -60,20 +112,79 @@ jobs:
             --username "$LT_USERNAME" \
             --access-key "$LT_ACCESS_KEY"
 
+      # Without this the runner uses the account default, and test cases can be
+      # hard to find in Test Manager. Note the action is `config project <id>`,
+      # not `config set project-id`.
+      - name: Set Test Manager project and folder
+        run: |
+          if [ -n "$KANE_PROJECT_ID" ]; then
+            kane-cli config project "$KANE_PROJECT_ID"
+          else
+            echo "No KANE_PROJECT_ID variable set - using the account default project."
+          fi
+          if [ -n "$KANE_FOLDER_ID" ]; then
+            kane-cli config folder "$KANE_FOLDER_ID"
+          else
+            echo "No KANE_FOLDER_ID variable set - using the account default folder."
+          fi
+
+      - name: Set default start URL
+        env:
+          START_URL: ${{ inputs.start_url }}
+        run: |
+          if [ -n "$START_URL" ]; then
+            kane-cli config set-url "$START_URL"
+            echo "Default start URL overridden: $START_URL"
+          else
+            echo "Using each test's own frontmatter url:."
+          fi
+
+      - name: Show active configuration
+        run: kane-cli config show
+
       - name: List committed tests
         run: kane-cli testmd list
 
       - name: Plan the suite
         run: kane-cli testrun run --dry-run --headless
 
+      # `testrun run` alone reports upload: skipped, so nothing reaches Test
+      # Manager. `testmd run` per member authors + replays + publishes each
+      # test case, which is what makes it appear in Test Manager.
+      - name: Publish and replay each test (Test Manager)
+        if: ${{ inputs.publish_to_test_manager != false }}
+        shell: bash
+        continue-on-error: true
+        run: |
+          shopt -s nullglob
+          : > authoring_links.tsv
+          for test_file in .testmuai/tests/*_test.md; do
+            echo "--- $test_file"
+            kane-cli testmd run "$test_file" \
+              --headless \
+              --agent 2>&1 | tee /tmp/testmd_out.txt || true
+            link=$(grep -oE 'https://[^ "]*test-manager[^ "]*' /tmp/testmd_out.txt | head -1 || true)
+            if [ -n "$link" ]; then
+              printf '%s\t%s\n' "$(basename "$test_file")" "$link" >> authoring_links.tsv
+            fi
+          done
+          if [ -s authoring_links.tsv ]; then
+            echo "Published test cases:"
+            cat authoring_links.tsv
+          fi
+
       - name: Run Twilio assurance suite
         env:
           ON_FAILURE: ${{ inputs.on_failure || 'continue' }}
           MATCH: ${{ inputs.match }}
+          TAGS: ${{ inputs.tags }}
         run: |
-          args=(--headless --on-failure "$ON_FAILURE")
+          args=(--headless --on-failure "$ON_FAILURE" --name "assurance run ${{ github.run_id }}")
           if [ -n "$MATCH" ]; then
             args+=(--match "$MATCH")
+          fi
+          if [ -n "$TAGS" ]; then
+            args+=(--tags "$TAGS")
           fi
           kane-cli testrun run "${args[@]}"
 
@@ -107,6 +218,52 @@ jobs:
             exit 1
           fi
 
+      # One sealed pack for the whole run, rather than one per member.
+      - name: Merge evidence packs
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          packs=(.testmuai/evidence/*.evidence)
+          merged=".testmuai/evidence/merged-${{ github.run_id }}.evidence"
+
+          if [ ${#packs[@]} -gt 1 ]; then
+            kane-cli evidence merge "${packs[@]}" \
+              --run-id "${{ github.run_id }}" \
+              --out "$merged"
+            echo "Merged ${#packs[@]} packs into $merged"
+          elif [ ${#packs[@]} -eq 1 ]; then
+            cp "${packs[0]}" "$merged"
+            echo "Single pack copied to $merged"
+          else
+            echo "No packs to merge."
+          fi
+
+      # Two-axis coverage: depth proven by the evidence pack, completeness owed
+      # by the committed .context/ graph. This is the last step of the
+      # lifecycle the README advertises, so it runs even when tests fail.
+      - name: Coverage report
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          merged=".testmuai/evidence/merged-${{ github.run_id }}.evidence"
+          if [ -f "$merged" ]; then
+            pack="$merged"
+          else
+            candidates=(.testmuai/evidence/*.evidence)
+            pack="${candidates[0]:-}"
+          fi
+
+          if [ -z "$pack" ]; then
+            echo "No evidence pack available - skipping coverage."
+            exit 0
+          fi
+
+          echo "Coverage from $pack"
+          kane-cli cover --from "$pack" --json | tee coverage.json || true
+          kane-cli cover --from "$pack" | tee coverage.txt || true
+
       - name: Summarise results
         if: always()
         shell: bash
@@ -120,20 +277,51 @@ jobs:
 
             if [ ${#results[@]} -eq 0 ]; then
               echo "No \`Result.md\` was produced."
-              exit 0
+            else
+              echo "### Execution"
+              echo
+              echo "| Test | Status | Duration |"
+              echo "| --- | --- | --- |"
+              for result in "${results[@]}"; do
+                name="$(basename "$(dirname "$result")")"
+                name="${name#output-}"
+                # Read the YAML frontmatter Kane CLI writes at the top of Result.md.
+                status="$(awk -F': *' '/^status:/ { print $2; exit }' "$result")"
+                duration="$(awk -F': *' '/^duration_s:/ { print $2 "s"; exit }' "$result")"
+                echo "| $name | ${status:-unknown} | ${duration:-n/a} |"
+              done
+              echo
             fi
 
-            echo "| Test | Status | Duration |"
-            echo "| --- | --- | --- |"
+            if [ -s coverage.json ]; then
+              echo "### Coverage"
+              echo
+              echo "| Use case | Status | % | ACs covered | passed | failed |"
+              echo "| --- | --- | --- | --- | --- | --- |"
+              jq -r '.depth[]? | "| \(.title) | \(.status) | \(.pct)% | \(.acs.covered)/\(.acs.total) | \(.acs.passed) | \(.acs.failed) |"' coverage.json 2>/dev/null || true
+              echo
+              gaps="$(jq -r '[.completeness[]?] | length' coverage.json 2>/dev/null || echo 0)"
+              if [ "${gaps:-0}" -gt 0 ]; then
+                echo "<details><summary>Completeness gaps (${gaps})</summary>"
+                echo
+                echo "| Ref | Gap |"
+                echo "| --- | --- |"
+                jq -r '.completeness[]? | "| \(.ref) | \(.kind) |"' coverage.json 2>/dev/null || true
+                echo
+                echo "</details>"
+                echo
+              fi
+            fi
 
-            for result in "${results[@]}"; do
-              name="$(basename "$(dirname "$result")")"
-              name="${name#output-}"
-              # Read the YAML frontmatter Kane CLI writes at the top of Result.md.
-              status="$(awk -F': *' '/^status:/ { print $2; exit }' "$result")"
-              duration="$(awk -F': *' '/^duration_s:/ { print $2 "s"; exit }' "$result")"
-              echo "| $name | ${status:-unknown} | ${duration:-n/a} |"
-            done
+            if [ -s authoring_links.tsv ]; then
+              echo "### Test Manager"
+              echo
+              echo "| Test | Link |"
+              echo "| --- | --- |"
+              while IFS=$'\t' read -r n l; do
+                echo "| $n | [open]($l) |"
+              done < authoring_links.tsv
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Kane CLI evidence
@@ -145,5 +333,8 @@ jobs:
             .testmuai/evidence/
             .testmuai/tests/**/Result.md
             .testmuai/tests/output-*/
+            coverage.json
+            coverage.txt
+            authoring_links.tsv
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 30

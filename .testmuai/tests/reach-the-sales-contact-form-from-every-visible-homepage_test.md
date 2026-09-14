@@ -1,4 +1,10 @@
 ---
+mode: testing
+url: https://www.twilio.com/en-us
+headless: true
+tags: [contact-sales, smoke, happy-path]
+max_steps: 40
+timeout: 300
 assurance:
   id: t-3
   base: sha256:86db92fa9a73dd2551d1984870b5d7a3ab42ca97f3f74cb26e6fdc77a8c7400e

@@ -1,0 +1,9 @@
+anchor: ac-1
+combinatorial:
+  reason: Applied the Web form profile because the journey ends on a public data-entry form and the source limits coverage to render and validation without submission. Applied equivalence partitioning to treat visible homepage Contact sales controls as one successful-navigation family because the required outcome is unchanged by control location. Negative, boundary-value, and covering-array techniques were not applied here because this path proves navigation and rendered form presence rather than constrained input combinations.
+  strength: 2
+deferred_bindings: 0
+expected_how: 'expected_mode: authored'
+profile_family: unspecified
+surface_state: absent
+technique: Applied the Web form profile because the journey ends on a public data-entry form and the source limits coverage to render and validation without submission. Applied equivalence partitioning to treat visible homepage Contact sales controls as one successful-navigation family because the required outcome is unchanged by control location. Negative, boundary-value, and covering-array techniques were not applied here because this path proves navigation and rendered form presence rather than constrained input combinations.

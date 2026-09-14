@@ -1,0 +1,114 @@
+name: Requirements Drift - Kane CLI Maintain
+
+# When the PRD changes, the committed suite may no longer match it.
+# `kane-cli maintain reconcile --plan` lands the head move and STAGES every
+# proposed suite change without committing any of it, so the diff can be read
+# on the PR before a human approves it on a workstation.
+#
+# This is deliberately plan-only. Nothing here promotes a change to trusted.
+
+on:
+  pull_request:
+    paths:
+      - "requirements/**"
+  workflow_dispatch:
+    inputs:
+      source_file:
+        description: "Path to the new version of the requirements document"
+        type: string
+        default: "requirements/PRD-Twilio-Website-and-Test-Cases.docx"
+      source_id:
+        description: "Existing source id this file succeeds"
+        type: string
+        default: "prd-twilio-website-and-test-cases"
+
+concurrency:
+  group: requirements-drift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconcile:
+    name: Preview requirement drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: |
+          if [ -z "$LT_USERNAME" ] || [ -z "$LT_ACCESS_KEY" ]; then
+            echo "::error::LT_USERNAME and LT_ACCESS_KEY repository secrets are not set."
+            exit 1
+          fi
+          kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
+
+      - name: Show known sources
+        run: kane-cli context list --type source || true
+
+      - name: Reconcile (plan only)
+        shell: bash
+        env:
+          SOURCE_FILE: ${{ inputs.source_file || 'requirements/PRD-Twilio-Website-and-Test-Cases.docx' }}
+          SOURCE_ID: ${{ inputs.source_id || 'prd-twilio-website-and-test-cases' }}
+        run: |
+          if [ ! -f "$SOURCE_FILE" ]; then
+            echo "::error::Requirements document not found: $SOURCE_FILE"
+            exit 1
+          fi
+
+          echo "Planning reconcile of '$SOURCE_ID' against $SOURCE_FILE"
+          kane-cli maintain reconcile \
+            --from "$SOURCE_FILE" \
+            --source-id "$SOURCE_ID" \
+            --plan \
+            --mode ci 2>&1 | tee reconcile.txt
+
+      - name: Summarise drift
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Requirement drift preview"
+            echo
+            if [ -s reconcile.txt ]; then
+              echo '```'
+              tail -c 8000 reconcile.txt
+              echo '```'
+              echo
+              echo "Nothing above has been committed. Approve or reject the staged"
+              echo "plan on a workstation with \`kane-cli maintain reconcile --apply\`."
+            else
+              echo "No reconcile output produced."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reconcile plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconcile-plan
+          path: |
+            reconcile.txt
+            .context/plans/
+          if-no-files-found: warn
+          retention-days: 30

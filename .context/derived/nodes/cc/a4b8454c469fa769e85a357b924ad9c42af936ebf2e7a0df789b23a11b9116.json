@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"After malformed sales-form input triggers validation, the sales form remains visible on the sales contact page for correction.","kind":"presence","risk":"high","derived":true,"expected_answer":{"operator":"exists","operand":"sales form remains visible on the sales contact page after malformed-input validation is triggered"}}}

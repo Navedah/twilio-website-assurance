@@ -1,0 +1,9 @@
+anchor: ac-4
+combinatorial:
+  reason: Applied the Web form profile and negative/error technique because the source explicitly requires malformed-input validation on the unauthenticated sales form. Applied equivalence partitioning to keep multiple malformed examples in one scenario because they should produce the same validation outcome; I used the owner-approved generic malformed rule rather than inventing an exact field or message that the corpus does not name. Boundary-value analysis and covering-array generation were not applied because the malformed-input promise is expressed as a single validation family, not as bounded numeric input or a cross-field combination problem.
+  strength: 2
+deferred_bindings: 0
+expected_how: 'expected_mode: authored'
+profile_family: unspecified
+surface_state: absent
+technique: Applied the Web form profile and negative/error technique because the source explicitly requires malformed-input validation on the unauthenticated sales form. Applied equivalence partitioning to keep multiple malformed examples in one scenario because they should produce the same validation outcome; I used the owner-approved generic malformed rule rather than inventing an exact field or message that the corpus does not name. Boundary-value analysis and covering-array generation were not applied because the malformed-input promise is expressed as a single validation family, not as bounded numeric input or a cross-field combination problem.

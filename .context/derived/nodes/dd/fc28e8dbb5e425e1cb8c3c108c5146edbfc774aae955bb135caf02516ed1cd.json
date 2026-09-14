@@ -1,0 +1,1 @@
+{"label":"ac","content":{"text":"The sales form displays inline validation when malformed input is triggered on a format-constrained field.","kind":"presence","risk":"high","derived":true,"expected_answer":{"operator":"exists","operand":"inline validation for malformed input on a format-constrained sales-form field"}}}

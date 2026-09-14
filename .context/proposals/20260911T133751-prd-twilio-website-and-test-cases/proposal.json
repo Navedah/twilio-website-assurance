@@ -1,0 +1,614 @@
+{
+  "version": 1,
+  "read_basis": "sha256:915fb12b648a4a80657bf8f8c31fc849f5bcb210010629a248914c54291759e6",
+  "source": {
+    "source_id": "prd-twilio-website-and-test-cases",
+    "source_cid": "sha256:6def87513a5d872e74aee12c25fb8b6255561f7ed6b125d82e30fdfb09a0bf99"
+  },
+  "use_cases": [
+    {
+      "temp_ref": "n1",
+      "title": "Begin a free trial",
+      "description": "An anonymous visitor uses any Start for free entry point on the public homepage to reach the Twilio sign-up page, confirm that the form renders its expected fields, labels, and consent text, and exercise client-side validation for empty, malformed, whitespace-only, overlong, and disallowed input without submitting the form, creating an account, or proceeding into authenticated onboarding.",
+      "summary": "Reach and validate the free-trial sign-up form without submitting it.",
+      "actors": [
+        "anonymous visitor",
+        "developer evaluator",
+        "technical buyer"
+      ],
+      "value": "Captures the primary self-serve conversion path in the acquisition funnel while keeping the no-account test boundary intact.",
+      "risk": "high",
+      "cite": {
+        "anchor": "L20-L20",
+        "quote": "Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales."
+      },
+      "cites": [
+        {
+          "anchor": "L20-L20",
+          "quote": "Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales."
+        },
+        {
+          "anchor": "L111-L112",
+          "quote": "Every Start for free control across the page leads to the free trial sign-up page and that page loads successfully."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Start-for-free controls in the header, hero, and closing band all lead to the same free trial page.",
+          "cite": {
+            "anchor": "L247-L247",
+            "quote": "All lead to the same free trial page and it loads successfully."
+          }
+        },
+        {
+          "text": "The sign-up form renders expected fields, labels, consent text, and correct label associations.",
+          "cite": {
+            "anchor": "L248-L248",
+            "quote": "All expected fields, labels, and the consent text render with correct associations."
+          }
+        },
+        {
+          "text": "Empty required fields trigger inline required-field messages and submission stays disabled or blocked.",
+          "cite": {
+            "anchor": "L249-L249",
+            "quote": "A required-field message appears for each, and the submit control stays disabled or blocks."
+          }
+        },
+        {
+          "text": "Synthetic invalid input coverage includes an empty string, a single space, an address missing the at sign, an address with a trailing dot, a 300-character string, a script tag, and a SQL fragment.",
+          "cite": {
+            "anchor": "L140-L140",
+            "quote": "Suggested invalid inputs: an empty string, a single space, an address missing the at sign, an address with a trailing dot, a 300-character string, a script tag, and a SQL fragment."
+          }
+        },
+        {
+          "text": "Navigating away without submission creates no account and sends no confirmation.",
+          "cite": {
+            "anchor": "L254-L254",
+            "quote": "No account is created and no confirmation is sent."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n2",
+      "title": "Contact sales",
+      "description": "An anonymous visitor follows a Contact sales call to action from the public website to the sales contact page, verifies that the form renders and applies client-side validation to empty and malformed inputs, and stops before submission so no real commercial lead is created.",
+      "summary": "Reach and validate the sales contact form without submitting it.",
+      "actors": [
+        "anonymous visitor",
+        "technical buyer",
+        "enterprise buyer"
+      ],
+      "value": "Preserves the assisted conversion path for buyers who need direct commercial contact.",
+      "risk": "high",
+      "cite": {
+        "anchor": "L20-L20",
+        "quote": "Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales."
+      },
+      "cites": [
+        {
+          "anchor": "L20-L20",
+          "quote": "Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales."
+        },
+        {
+          "anchor": "L113-L113",
+          "quote": "Every Contact sales control leads to the sales contact page, which renders its form fields and validates them client-side."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Contact-sales controls lead to the sales contact page and render its form fields.",
+          "cite": {
+            "anchor": "L255-L255",
+            "quote": "The sales contact page loads and renders its form fields."
+          }
+        },
+        {
+          "text": "The sales form shows inline validation for empty and malformed input and is not submitted.",
+          "cite": {
+            "anchor": "L256-L256",
+            "quote": "Inline validation appears for each field; the form is not submitted."
+          }
+        },
+        {
+          "text": "Conversion-form coverage stops at render and validation; submission is never performed.",
+          "cite": {
+            "anchor": "L50-L50",
+            "quote": "Where a test case reaches a conversion form, the case ends at verifying the form renders and validates correctly. The submit action is never performed."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n3",
+      "title": "Reach support, status, and login entry points",
+      "description": "An existing customer uses the public homepage as a routing surface to reach the Help Center, Support Plans, Partner Solutions, status pages, or the Console, Segment, and SendGrid login destinations, with verification ending at the public destination or login screen rather than attempting authentication.",
+      "summary": "Use the homepage to reach support, status, and login destinations.",
+      "actors": [
+        "existing customer"
+      ],
+      "value": "Lets current customers quickly exit the marketing site to the correct support or authentication surface.",
+      "risk": "high",
+      "cite": {
+        "anchor": "L27-L27",
+        "quote": "Get to the console, the help centre, or the status page"
+      },
+      "cites": [
+        {
+          "anchor": "L27-L27",
+          "quote": "Get to the console, the help centre, or the status page"
+        },
+        {
+          "anchor": "L115-L115",
+          "quote": "Login menu entries point at the correct authentication destinations. Verification stops at the login screen rendering."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The Support menu lists Help Center, Support Plans, and Partner Solutions.",
+          "cite": {
+            "anchor": "L58-L58",
+            "quote": "Help Center, Support Plans, Partner Solutions"
+          }
+        },
+        {
+          "text": "The Login menu lists Console, Segment, and SendGrid, and coverage stops at presence and target validation rather than authenticating.",
+          "cite": {
+            "anchor": "L59-L59",
+            "quote": "Console, Segment, SendGrid — presence and link target only; not followed past the login screen"
+          }
+        },
+        {
+          "text": "Resources navigation includes Help Center and Status pages as public destinations.",
+          "cite": {
+            "anchor": "L67-L67",
+            "quote": "Documentation, Code Exchange, Developer Hub, Champions, Changelog, Serverless, Blog, Resource Center, Guides, Reports, Webinars, Podcasts, State of Customer Engagement, Help Center, Partners, Professional services, Support plans, Status pages"
+          }
+        },
+        {
+          "text": "The Console login target must render its login screen over HTTPS, with no attempt to authenticate.",
+          "cite": {
+            "anchor": "L259-L259",
+            "quote": "The login screen renders over HTTPS. Stop here — do not attempt to authenticate."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n4",
+      "title": "Browse products, solutions, resources, and pricing",
+      "description": "An anonymous visitor uses the global header, mega menus, and mobile navigation to discover product, solution, resource, and pricing pages, with menus opening by pointer or click, remaining keyboard-operable, collapsing into expandable mobile sections below the mobile breakpoint, and linking only to live public destinations that load successfully without long redirect chains.",
+      "summary": "Use global navigation to reach public product, solution, resource, and pricing pages.",
+      "actors": [
+        "anonymous visitor",
+        "developer evaluator",
+        "technical buyer"
+      ],
+      "value": "Supports the core discovery journey that routes visitors from the homepage to the right public information page.",
+      "risk": "med",
+      "cite": {
+        "anchor": "L20-L20",
+        "quote": "Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales."
+      },
+      "cites": [
+        {
+          "anchor": "L20-L20",
+          "quote": "Twilio sells communication and customer-engagement APIs. The public website is the top of the acquisition funnel: it explains the platform, routes visitors to the right product or solution page, and drives two conversion actions — starting a free trial and contacting sales."
+        },
+        {
+          "anchor": "L25-L25",
+          "quote": "Compare products, understand the platform, check pricing"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The header exposes exactly five top-level menus: Products, Solutions, Why Twilio, Resources, and Pricing.",
+          "cite": {
+            "anchor": "L75-L75",
+            "quote": "Five top-level menus are present: Products, Solutions, Why Twilio, Resources, Pricing."
+          }
+        },
+        {
+          "text": "Each top-level menu opens a mega menu on hover or click and closes on outside click, Escape, and when another menu opens.",
+          "cite": {
+            "anchor": "L76-L76",
+            "quote": "Each top-level menu opens a mega menu on hover or click, and closes on outside click, on Escape, and when another menu opens."
+          }
+        },
+        {
+          "text": "The Products menu exposes the documented sub-groups Twilio Platform, Conversations, Communications, Authentication, and Customer Data with representative destinations including Messaging, SMS, WhatsApp, Voice, Email, Verify, Lookup, Engage, and Audiences.",
+          "cite": {
+            "anchor": "L64-L64",
+            "quote": "Twilio Platform, Conversations, Communications, Authentication, Customer Data\tConversation Memory, Conversation Orchestrator, Conversation Intelligence, Conversation Relay, Messaging, SMS, WhatsApp, RCS, Voice, SIP Trunking, Email, SMTP, Phone Numbers, Toll-free, 10DLC, Short Codes, Video, Flex, Verify, Lookup, Connections, Warehouses, Protocols, Unify, Engage, Audiences, Journeys"
+          }
+        },
+        {
+          "text": "The Solutions menu exposes Use Cases, Teams, Industry, and Company Size with representative destinations including Verification and identity, Fraud prevention, Alerts and notifications, Appointment reminders, Mass texting, Marketing and promotions, Voice AI, IVR, Contact center, Financial services, Healthcare, Retail, Public sector, Education, Enterprise, and Startup.",
+          "cite": {
+            "anchor": "L65-L65",
+            "quote": "Use Cases, Teams, Industry, Company Size\tVerification and identity, Fraud prevention, Alerts and notifications, Appointment reminders, Mass texting, Marketing and promotions, SMS marketing, Support and sales, Voice AI, IVR, Contact center, Developers, Marketing, Financial services, Healthcare, Retail, Nonprofit, Hospitality, Ecommerce, Public sector, Education, Enterprise, Startup"
+          }
+        },
+        {
+          "text": "The Why Twilio menu exposes Overview, Differentiators, and Company destinations including Why Twilio, Customer stories, One platform, Trust center, Enterprise scale, Global infrastructure, About us, Values, Diversity, Careers, Twilio.org, Investor relations, Press, and Events.",
+          "cite": {
+            "anchor": "L66-L66",
+            "quote": "Overview, Differentiators, Company\tWhy Twilio, Customer stories, One platform, Trust center, Enterprise scale, Global infrastructure, About us, Values, Diversity, Careers, Twilio.org, Investor relations, Press, Events"
+          }
+        },
+        {
+          "text": "The Resources menu exposes Developers, Learn, and Support and services destinations including Documentation, Code Exchange, Developer Hub, Blog, Resource Center, Help Center, Partners, Support plans, and Status pages.",
+          "cite": {
+            "anchor": "L67-L67",
+            "quote": "Developers, Learn, Support and services\tDocumentation, Code Exchange, Developer Hub, Champions, Changelog, Serverless, Blog, Resource Center, Guides, Reports, Webinars, Podcasts, State of Customer Engagement, Help Center, Partners, Professional services, Support plans, Status pages"
+          }
+        },
+        {
+          "text": "The Pricing menu exposes Overview, Conversations, Communications, Authentication, and Customer Data destinations including All pricing, Messaging pricing, SMS pricing, WhatsApp pricing, Voice pricing, Email API pricing, Video pricing, Flex pricing, Verify pricing, Lookup pricing, and CDP pricing.",
+          "cite": {
+            "anchor": "L68-L68",
+            "quote": "Overview, Conversations, Communications, Authentication, Customer Data\tAll pricing, Messaging pricing, SMS pricing, WhatsApp pricing, Voice pricing, SIP Trunking pricing, Email API pricing, Video pricing, Flex pricing, Verify pricing, Lookup pricing, CDP pricing"
+          }
+        },
+        {
+          "text": "Below the mobile breakpoint, navigation collapses to a toggle and all five menu groups remain reachable as expandable sections.",
+          "cite": {
+            "anchor": "L83-L83",
+            "quote": "At viewports below the mobile breakpoint the navigation collapses to a toggle, and all menu groups remain reachable as expandable sections."
+          }
+        },
+        {
+          "text": "Every mega-menu link resolves to a live page returning HTTP 200 with no redirect chain longer than one hop.",
+          "cite": {
+            "anchor": "L77-L77",
+            "quote": "Every link inside every mega menu resolves to a live page returning HTTP 200 with no redirect chain longer than one hop."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n5",
+      "title": "Switch the website language",
+      "description": "An anonymous visitor changes the site locale through the utility-bar language selector, expects one of the six published languages, lands on the equivalent localised path when available, and sees translated content with correct character rendering rather than untranslated placeholders.",
+      "summary": "Change the site locale and stay on a valid localized experience.",
+      "actors": [
+        "anonymous visitor"
+      ],
+      "value": "Supports international discovery by routing visitors to the right localized public experience.",
+      "risk": "med",
+      "cite": {
+        "anchor": "L34-L34",
+        "quote": "- Locale switching between the six published languages."
+      },
+      "cites": [
+        {
+          "anchor": "L34-L34",
+          "quote": "- Locale switching between the six published languages."
+        },
+        {
+          "anchor": "L81-L81",
+          "quote": "Selecting a language navigates to the equivalent localised path and the page renders in that language."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The language selector lists exactly six locales: en-us, fr-fr, de-de, ja-jp, pt-br, es-mx.",
+          "cite": {
+            "anchor": "L57-L57",
+            "quote": "en-us, fr-fr, de-de, ja-jp, pt-br, es-mx"
+          }
+        },
+        {
+          "text": "Selecting a locale navigates to the equivalent localised path and renders the page in that language.",
+          "cite": {
+            "anchor": "L81-L81",
+            "quote": "Selecting a language navigates to the equivalent localised path and the page renders in that language."
+          }
+        },
+        {
+          "text": "Each locale renders translated content with correct character encoding and no untranslated placeholder strings.",
+          "cite": {
+            "anchor": "L130-L130",
+            "quote": "Each locale renders translated content with correct character encoding and no untranslated placeholder strings."
+          }
+        },
+        {
+          "text": "Switching locale from a deep product page lands on the equivalent localised page, or on the localised homepage if no equivalent exists.",
+          "cite": {
+            "anchor": "L322-L322",
+            "quote": "Lands on the equivalent localised page, or the localised homepage if no equivalent exists."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n6",
+      "title": "Evaluate the platform with homepage content",
+      "description": "An anonymous visitor uses the homepage hero, trust indicators, platform narrative, and product grid to understand what Twilio offers, compare major product areas, and follow onward links to deeper product or platform pages, with the content remaining usable across pointer and touch interaction patterns.",
+      "summary": "Use homepage marketing content to understand Twilio’s platform and products.",
+      "actors": [
+        "anonymous visitor",
+        "technical buyer"
+      ],
+      "value": "Turns the homepage into a self-serve product overview that helps buyers decide where to go next.",
+      "risk": "med",
+      "cite": {
+        "anchor": "L21-L21",
+        "quote": "The homepage itself is a single long-scroll marketing page with a persistent global header. Its content sections are, in order: a hero with dual calls to action, a platform narrative in four parts, a product grid of six cards, a multi-language code sample block, a customer results carousel, an analyst recognition band, a closing conversion band, and a large footer with a sources accordion."
+      },
+      "cites": [
+        {
+          "anchor": "L21-L21",
+          "quote": "The homepage itself is a single long-scroll marketing page with a persistent global header. Its content sections are, in order: a hero with dual calls to action, a platform narrative in four parts, a product grid of six cards, a multi-language code sample block, a customer results carousel, an analyst recognition band, a closing conversion band, and a large footer with a sources accordion."
+        },
+        {
+          "anchor": "L87-L90",
+          "quote": "The hero renders a headline, a supporting paragraph, and two calls to action, with the primary action leading to the free trial and the secondary to the platform page."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The hero renders a headline, a supporting paragraph, and two calls to action, with the primary action leading to the free trial and the secondary to the platform page.",
+          "cite": {
+            "anchor": "L87-L87",
+            "quote": "The hero renders a headline, a supporting paragraph, and two calls to action, with the primary action leading to the free trial and the secondary to the platform page."
+          }
+        },
+        {
+          "text": "Three trust indicators appear beneath the hero actions and cover trial availability, card requirement, and pricing flexibility.",
+          "cite": {
+            "anchor": "L88-L88",
+            "quote": "Three trust indicators appear beneath the hero actions covering trial availability, card requirement, and pricing flexibility."
+          }
+        },
+        {
+          "text": "The platform narrative presents four themes — self-service, hand-off, continuity, and memory — each with a heading, description, associated product tags, and an image.",
+          "cite": {
+            "anchor": "L89-L89",
+            "quote": "The platform narrative section presents four themes — self-service, hand-off, continuity, and memory — each with a heading, description, associated product tags, and an image."
+          }
+        },
+        {
+          "text": "The product grid renders six cards: Conversations, Messaging, Email, Voice, User authentication, and Customer data; each card has an image, a heading, a description, and a link.",
+          "cite": {
+            "anchor": "L90-L90",
+            "quote": "The product grid renders six cards: Conversations, Messaging, Email, Voice, User authentication, Customer data. Each card has an image, a heading, a description, and a link."
+          }
+        },
+        {
+          "text": "Product cards show a hover state on pointer devices and remain fully usable without hover on touch devices.",
+          "cite": {
+            "anchor": "L91-L91",
+            "quote": "Product cards show a hover state on pointer devices and remain fully usable without hover on touch devices."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n7",
+      "title": "Evaluate integration options with code samples and documentation",
+      "description": "A developer evaluator uses the homepage code sample block to compare implementation examples across supported languages, switch tabs without leaving the page, copy readable code, and jump to the documentation site for deeper technical detail.",
+      "summary": "Use code samples and docs links to assess implementation options.",
+      "actors": [
+        "developer evaluator"
+      ],
+      "value": "Reduces evaluation friction by showing concrete, copyable implementation examples and a path to docs.",
+      "risk": "med",
+      "cite": {
+        "anchor": "L24-L24",
+        "quote": "Reaches docs or copies a code sample"
+      },
+      "cites": [
+        {
+          "anchor": "L24-L24",
+          "quote": "Reaches docs or copies a code sample"
+        },
+        {
+          "anchor": "L92-L93",
+          "quote": "The code sample block offers seven language tabs — Python, C#, PHP, Ruby, Java, JavaScript, cURL — and swaps the displayed sample without a page reload."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The code sample block offers seven language tabs — Python, C#, PHP, Ruby, Java, JavaScript, cURL — and swaps the displayed sample without a page reload.",
+          "cite": {
+            "anchor": "L92-L92",
+            "quote": "The code sample block offers seven language tabs — Python, C#, PHP, Ruby, Java, JavaScript, cURL — and swaps the displayed sample without a page reload."
+          }
+        },
+        {
+          "text": "The selected code sample is syntax-highlighted, horizontally scrollable if it overflows, and selectable as text.",
+          "cite": {
+            "anchor": "L93-L93",
+            "quote": "The selected code sample is syntax-highlighted, horizontally scrollable if it overflows, and selectable as text."
+          }
+        },
+        {
+          "text": "Each sample shows a send-message example in idiomatic syntax for that language.",
+          "cite": {
+            "anchor": "L209-L209",
+            "quote": "Each shows a send-message example in idiomatic syntax for that language."
+          }
+        },
+        {
+          "text": "Tabs follow expected keyboard tab-pattern semantics and update the panel.",
+          "cite": {
+            "anchor": "L212-L212",
+            "quote": "Tabs follow the expected tab-pattern semantics and the panel updates."
+          }
+        },
+        {
+          "text": "The block provides a working path from the homepage to the documentation site.",
+          "cite": {
+            "anchor": "L213-L213",
+            "quote": "The documentation site loads."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n8",
+      "title": "Assess Twilio credibility and sources",
+      "description": "An enterprise buyer uses customer results, analyst recognition, and the linked sources accordion on the homepage to judge Twilio’s credibility, see quantified proof points, and trace each public claim back to a cited source.",
+      "summary": "Use customer proof and analyst citations to assess credibility.",
+      "actors": [
+        "enterprise buyer"
+      ],
+      "value": "Builds trust with proof points and traceable claims before a buyer engages sales.",
+      "risk": "med",
+      "cite": {
+        "anchor": "L26-L26",
+        "quote": "Assess credibility, security posture, and analyst standing"
+      },
+      "cites": [
+        {
+          "anchor": "L26-L26",
+          "quote": "Assess credibility, security posture, and analyst standing"
+        },
+        {
+          "anchor": "L94-L97",
+          "quote": "The customer results carousel presents at least eight customer entries, each with a logo and a quantified result, and is advanceable by control, swipe, and keyboard."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The customer results carousel presents at least eight customer entries, each with a logo and a quantified result, and is advanceable by control, swipe, and keyboard.",
+          "cite": {
+            "anchor": "L94-L94",
+            "quote": "The customer results carousel presents at least eight customer entries, each with a logo and a quantified result, and is advanceable by control, swipe, and keyboard."
+          }
+        },
+        {
+          "text": "The analyst recognition band displays three analyst entries, each with a recurrence count and a link to the corresponding report or landing page.",
+          "cite": {
+            "anchor": "L95-L95",
+            "quote": "The analyst recognition band displays three analyst entries, each with a recurrence count and a link to the corresponding report or landing page."
+          }
+        },
+        {
+          "text": "Every analyst and customer claim carries a numbered reference that resolves to an entry in the footer sources accordion.",
+          "cite": {
+            "anchor": "L96-L96",
+            "quote": "Every analyst and customer claim carries a numbered reference resolving to an entry in the sources accordion in the footer."
+          }
+        },
+        {
+          "text": "The sources accordion expands and collapses on activation and is expandable by keyboard.",
+          "cite": {
+            "anchor": "L97-L97",
+            "quote": "The sources accordion expands and collapses on activation and is expandable by keyboard."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n9",
+      "title": "Search the public website",
+      "description": "An anonymous visitor opens the site search control from the homepage chrome, sees the data-collection notice and privacy-policy link, enters a term, and receives either suggestions or a results route without breaking the page or throwing console errors.",
+      "summary": "Use the public site search entry point.",
+      "actors": [
+        "anonymous visitor",
+        "developer evaluator"
+      ],
+      "value": "Shortens time to information when navigation browsing is slower than direct search.",
+      "risk": "low",
+      "cite": {
+        "anchor": "L61-L61",
+        "quote": "Site search overlay with a privacy notice"
+      },
+      "cites": [
+        {
+          "anchor": "L61-L61",
+          "quote": "Site search overlay with a privacy notice"
+        },
+        {
+          "anchor": "L82-L82",
+          "quote": "The search control opens a search input and displays the associated data-collection notice with a link to the privacy policy."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The search control opens a search input and displays the data-collection notice with a privacy-policy link.",
+          "cite": {
+            "anchor": "L82-L82",
+            "quote": "The search control opens a search input and displays the associated data-collection notice with a link to the privacy policy."
+          }
+        },
+        {
+          "text": "Search input accepts text and offers suggestions or a results route without causing a console error.",
+          "cite": {
+            "anchor": "L178-L178",
+            "quote": "Input accepts text and suggestions or a results route is offered; no console error."
+          }
+        }
+      ],
+      "depends_on_hint": []
+    },
+    {
+      "temp_ref": "n10",
+      "title": "Reach company, legal, and social destinations",
+      "description": "A visitor who needs company, investor, press, legal, privacy, security, or social-channel information uses the public website’s company navigation and footer to reach those external or corporate destinations from the anonymous experience.",
+      "summary": "Use public company/footer links to reach corporate, legal, and social information.",
+      "actors": [
+        "job seeker / press / investor",
+        "anonymous visitor"
+      ],
+      "value": "Supports corporate discovery and compliance access without requiring an account.",
+      "risk": "low",
+      "cite": {
+        "anchor": "L28-L28",
+        "quote": "Reach company information"
+      },
+      "cites": [
+        {
+          "anchor": "L28-L28",
+          "quote": "Reach company information"
+        },
+        {
+          "anchor": "L104-L105",
+          "quote": "Legal and corporate links are present: Careers, Twilio.org, Press, Investor relations, Legal, Privacy, Security, Impressum, Sitemap."
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Legal and corporate links include Careers, Twilio.org, Press, Investor relations, Legal, Privacy, Security, Impressum, and Sitemap.",
+          "cite": {
+            "anchor": "L104-L104",
+            "quote": "Legal and corporate links are present: Careers, Twilio.org, Press, Investor relations, Legal, Privacy, Security, Impressum, Sitemap."
+          }
+        },
+        {
+          "text": "Social links open in a new tab with appropriate rel attributes and accessible names.",
+          "cite": {
+            "anchor": "L105-L105",
+            "quote": "Social links open in a new tab with appropriate rel attributes and accessible names."
+          }
+        },
+        {
+          "text": "The sitemap link resolves to a valid XML sitemap, and the machine-readable llms.txt resolves successfully.",
+          "cite": {
+            "anchor": "L107-L107",
+            "quote": "The sitemap link resolves to a valid XML sitemap, and the machine-readable llms.txt resolves successfully."
+          }
+        },
+        {
+          "text": "Company navigation includes About us, Values, Diversity, Careers, Twilio.org, Investor relations, Press, and Events.",
+          "cite": {
+            "anchor": "L66-L66",
+            "quote": "Overview, Differentiators, Company\tWhy Twilio, Customer stories, One platform, Trust center, Enterprise scale, Global infrastructure, About us, Values, Diversity, Careers, Twilio.org, Investor relations, Press, Events"
+          }
+        }
+      ],
+      "depends_on_hint": []
+    }
+  ]
+}
