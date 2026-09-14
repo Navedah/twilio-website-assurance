@@ -186,7 +186,29 @@ jobs:
           if [ -n "$TAGS" ]; then
             args+=(--tags "$TAGS")
           fi
-          kane-cli testrun run "${args[@]}"
+          set -o pipefail
+          kane-cli testrun run "${args[@]}" | tee testrun_output.ndjson
+
+      # The batch run seals one pack covering the whole suite. Record its id:
+      # it is the only pack whose coverage reflects every member, and the
+      # per-member testmd packs each prove only their own criteria.
+      - name: Record batch evidence pack
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -s testrun_output.ndjson ]; then
+            echo "No testrun output to read."
+            exit 0
+          fi
+          batch_id="$(grep -o '{"type":"testrun_summary".*' testrun_output.ndjson \
+            | tail -1 \
+            | jq -r '.execution.evidence_id // .execution.id // empty' 2>/dev/null || true)"
+          if [ -n "$batch_id" ] && [ -f ".testmuai/evidence/${batch_id}.evidence" ]; then
+            echo "BATCH_PACK=.testmuai/evidence/${batch_id}.evidence" >> "$GITHUB_ENV"
+            echo "Batch pack: .testmuai/evidence/${batch_id}.evidence"
+          else
+            echo "Could not resolve the batch pack id; coverage will fall back."
+          fi
 
       - name: Show evidence files
         if: always()
@@ -218,7 +240,8 @@ jobs:
             exit 1
           fi
 
-      # One sealed pack for the whole run, rather than one per member.
+      # One sealed archive for distribution. Note this pack is NOT usable for
+      # coverage - merging does not carry coverage/usecases.yaml through.
       - name: Merge evidence packs
         if: always()
         shell: bash
@@ -242,17 +265,29 @@ jobs:
       # Two-axis coverage: depth proven by the evidence pack, completeness owed
       # by the committed .context/ graph. This is the last step of the
       # lifecycle the README advertises, so it runs even when tests fail.
+      #
+      # Read the BATCH pack, never the merged one: `evidence merge` does not
+      # carry coverage/usecases.yaml through, so `cover` on a merged pack fails
+      # with "carries no coverage/usecases.yaml".
       - name: Coverage report
         if: always()
         shell: bash
         run: |
           shopt -s nullglob
-          merged=".testmuai/evidence/merged-${{ github.run_id }}.evidence"
-          if [ -f "$merged" ]; then
-            pack="$merged"
-          else
-            candidates=(.testmuai/evidence/*.evidence)
-            pack="${candidates[0]:-}"
+          pack="${BATCH_PACK:-}"
+
+          if [ -z "$pack" ] || [ ! -f "$pack" ]; then
+            # Fall back to the newest pack that is not a merged one.
+            newest=""
+            for candidate in .testmuai/evidence/*.evidence; do
+              case "$(basename "$candidate")" in
+                merged-*) continue ;;
+              esac
+              if [ -z "$newest" ] || [ "$candidate" -nt "$newest" ]; then
+                newest="$candidate"
+              fi
+            done
+            pack="$newest"
           fi
 
           if [ -z "$pack" ]; then
@@ -261,8 +296,14 @@ jobs:
           fi
 
           echo "Coverage from $pack"
-          kane-cli cover --from "$pack" --json | tee coverage.json || true
+          kane-cli cover --from "$pack" --json > coverage.json || true
           kane-cli cover --from "$pack" | tee coverage.txt || true
+
+          if [ ! -s coverage.json ]; then
+            echo "::warning::cover produced no JSON for $pack"
+          else
+            cat coverage.json
+          fi
 
       - name: Summarise results
         if: always()
@@ -336,5 +377,6 @@ jobs:
             coverage.json
             coverage.txt
             authoring_links.tsv
+            testrun_output.ndjson
           if-no-files-found: warn
           retention-days: 30

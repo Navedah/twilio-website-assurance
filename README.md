@@ -233,17 +233,26 @@ kane-cli evidence serve .testmuai/evidence/<execution-id>.evidence
 The pack contains the test definitions, results, screenshots, console and network logs and
 failure information. Per-test reports land in `.testmuai/tests/output-*/Result.md`.
 
-Merge several packs into one:
+Merge several packs into one archive for distribution:
 
 ```bash
 kane-cli evidence merge .testmuai/evidence/*.evidence --run-id local-1 --out merged.evidence
 ```
 
-Then measure coverage against the committed graph:
+Measure coverage against the committed graph — from the **batch** pack that `testrun` sealed,
+not the merged one:
 
 ```bash
-kane-cli cover --from merged.evidence
+kane-cli cover --from .testmuai/evidence/<execution-id>.evidence
 ```
+
+> `evidence merge` does not carry `coverage/usecases.yaml` through, so `cover` on a merged
+> pack fails with *"carries no coverage/usecases.yaml"*. Merge for distribution; measure
+> coverage from the batch pack. The workflow reads the execution id out of the `testrun`
+> output to pick it automatically.
+
+A per-member `testmd run` pack only proves its own criteria — in one run the three members
+scored 17%, 17% and 33% individually, while the batch pack scored 100%.
 
 Do not commit `.testmuai/evidence/`.
 
