@@ -130,7 +130,10 @@ jobs:
   publish:
     name: "Phase 2 - Publish: Test Manager"
     needs: preflight
-    if: ${{ inputs.publish_to_test_manager != false }}
+    # `inputs` is empty on push/pull_request, so this must treat null as "yes".
+    # A bare `inputs.x != false` is always FALSE off workflow_dispatch, because
+    # GitHub coerces both null and false to 0 when comparing across types.
+    if: ${{ inputs.publish_to_test_manager == null || inputs.publish_to_test_manager }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
