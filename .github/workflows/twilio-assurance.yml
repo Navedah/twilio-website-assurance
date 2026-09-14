@@ -1,8 +1,17 @@
 name: Twilio Public Website - Kane CLI Assurance
 
-# Execution phase only. The design phase (ingest -> extract -> review -> design)
-# is performed by a human on a workstation and its reviewed output is committed.
-# See README.md for why that split is deliberate.
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║  Requirement to proof, one phase per job  (TestMu AI Assurance)          ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# Phases 1-6 below are the EXECUTION half of the lifecycle. The design half
+# (ingest -> extract -> review -> design) is performed by a human on a
+# workstation and its reviewed output is committed. See README.md.
+#
+# Required secrets:
+#   LT_USERNAME / LT_ACCESS_KEY   - TestMu AI credentials
+# Optional repository variables:
+#   KANE_PROJECT_ID / KANE_FOLDER_ID  - Test Manager destination
 
 on:
   pull_request:
@@ -62,43 +71,33 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Where test cases land in Test Manager. Blank = account default.
-  # Set these as repository variables (Settings > Secrets and variables > Actions > Variables).
   KANE_PROJECT_ID: ${{ vars.KANE_PROJECT_ID }}
   KANE_FOLDER_ID: ${{ vars.KANE_FOLDER_ID }}
 
 jobs:
-  twilio-assurance:
-    name: Run Twilio sales-contact assurance suite
+  # ── Phase 1 ───────────────────────────────────────────────────────────────
+  preflight:
+    name: "Phase 1 - Preflight: Verify and Plan"
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      # Avoids re-downloading kane-cli on every fresh runner.
       - name: Cache npm
         uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-npm-kane-cli
           restore-keys: ${{ runner.os }}-npm-
-
       - name: Install Kane CLI
         run: npm install -g @testmuai/kane-cli
-
       - name: Verify toolchain
         run: |
           node --version
           kane-cli --version
           google-chrome --version || chromium --version
-
       - name: Authenticate with TestMu AI
         env:
           LT_USERNAME: ${{ secrets.LT_USERNAME }}
@@ -108,13 +107,50 @@ jobs:
             echo "::error::LT_USERNAME and LT_ACCESS_KEY repository secrets are not set."
             exit 1
           fi
-          kane-cli login \
-            --username "$LT_USERNAME" \
-            --access-key "$LT_ACCESS_KEY"
+          kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
+      - name: List committed tests
+        run: kane-cli testmd list
+      - name: Plan the suite
+        run: kane-cli testrun run --dry-run --headless
+      - name: Phase 1 summary
+        if: always()
+        run: |
+          {
+            echo "## Phase 1 - Preflight"
+            echo
+            echo "Toolchain verified, credentials accepted, suite planned."
+            echo
+            echo "| Test | Tags |"
+            echo "| --- | --- |"
+            kane-cli testmd list 2>/dev/null \
+              | jq -r 'select(.name) | "| \(.name) | \((.tags // []) | join(", ")) |"' 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      # Without this the runner uses the account default, and test cases can be
-      # hard to find in Test Manager. Note the action is `config project <id>`,
-      # not `config set project-id`.
+  # ── Phase 2 ───────────────────────────────────────────────────────────────
+  publish:
+    name: "Phase 2 - Publish: Test Manager"
+    needs: preflight
+    if: ${{ inputs.publish_to_test_manager != false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
       - name: Set Test Manager project and folder
         run: |
           if [ -n "$KANE_PROJECT_ID" ]; then
@@ -127,7 +163,83 @@ jobs:
           else
             echo "No KANE_FOLDER_ID variable set - using the account default folder."
           fi
+      - name: Show active configuration
+        run: kane-cli config show
+      # `testrun run` alone reports upload: skipped, so nothing reaches Test
+      # Manager. `testmd run` per member authors, replays and publishes each
+      # case, which is what makes it appear there.
+      - name: Publish and replay each test
+        shell: bash
+        run: |
+          shopt -s nullglob
+          : > authoring_links.tsv
+          failed=0
+          for test_file in .testmuai/tests/*_test.md; do
+            echo "--- $test_file"
+            kane-cli testmd run "$test_file" --headless --agent 2>&1 | tee /tmp/out.txt || failed=1
+            link=$(grep -oE 'https://[^ "]*test-manager[^ "]*' /tmp/out.txt | head -1 || true)
+            [ -n "$link" ] && printf '%s\t%s\n' "$(basename "$test_file")" "$link" >> authoring_links.tsv
+          done
+          exit $failed
+      - name: Upload publish evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-publish
+          path: |
+            .testmuai/evidence/
+            authoring_links.tsv
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Phase 2 summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Phase 2 - Publish"
+            echo
+            if [ -s authoring_links.tsv ]; then
+              echo "| Test case | Test Manager |"
+              echo "| --- | --- |"
+              while IFS=$'\t' read -r n l; do
+                echo "| ${n%_test.md} | [open]($l) |"
+              done < authoring_links.tsv
+            else
+              echo "No Test Manager links were captured."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
+  # ── Phase 3 ───────────────────────────────────────────────────────────────
+  run:
+    name: "Phase 3 - Run: Execute the Suite"
+    needs: [preflight, publish]
+    if: always() && needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      batch_pack: ${{ steps.batch.outputs.batch_pack }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
+      - name: Set Test Manager project and folder
+        run: |
+          [ -n "$KANE_PROJECT_ID" ] && kane-cli config project "$KANE_PROJECT_ID" || true
+          [ -n "$KANE_FOLDER_ID" ] && kane-cli config folder "$KANE_FOLDER_ID" || true
       - name: Set default start URL
         env:
           START_URL: ${{ inputs.start_url }}
@@ -138,245 +250,327 @@ jobs:
           else
             echo "Using each test's own frontmatter url:."
           fi
-
-      - name: Show active configuration
-        run: kane-cli config show
-
-      - name: List committed tests
-        run: kane-cli testmd list
-
-      - name: Plan the suite
-        run: kane-cli testrun run --dry-run --headless
-
-      # `testrun run` alone reports upload: skipped, so nothing reaches Test
-      # Manager. `testmd run` per member authors + replays + publishes each
-      # test case, which is what makes it appear in Test Manager.
-      - name: Publish and replay each test (Test Manager)
-        if: ${{ inputs.publish_to_test_manager != false }}
-        shell: bash
-        continue-on-error: true
-        run: |
-          shopt -s nullglob
-          : > authoring_links.tsv
-          for test_file in .testmuai/tests/*_test.md; do
-            echo "--- $test_file"
-            kane-cli testmd run "$test_file" \
-              --headless \
-              --agent 2>&1 | tee /tmp/testmd_out.txt || true
-            link=$(grep -oE 'https://[^ "]*test-manager[^ "]*' /tmp/testmd_out.txt | head -1 || true)
-            if [ -n "$link" ]; then
-              printf '%s\t%s\n' "$(basename "$test_file")" "$link" >> authoring_links.tsv
-            fi
-          done
-          if [ -s authoring_links.tsv ]; then
-            echo "Published test cases:"
-            cat authoring_links.tsv
-          fi
-
-      - name: Run Twilio assurance suite
+      - name: Run the suite
         env:
           ON_FAILURE: ${{ inputs.on_failure || 'continue' }}
           MATCH: ${{ inputs.match }}
           TAGS: ${{ inputs.tags }}
         run: |
           args=(--headless --on-failure "$ON_FAILURE" --name "assurance run ${{ github.run_id }}")
-          if [ -n "$MATCH" ]; then
-            args+=(--match "$MATCH")
-          fi
-          if [ -n "$TAGS" ]; then
-            args+=(--tags "$TAGS")
-          fi
+          [ -n "$MATCH" ] && args+=(--match "$MATCH")
+          [ -n "$TAGS" ] && args+=(--tags "$TAGS")
           set -o pipefail
           kane-cli testrun run "${args[@]}" | tee testrun_output.ndjson
-
-      # The batch run seals one pack covering the whole suite. Record its id:
-      # it is the only pack whose coverage reflects every member, and the
-      # per-member testmd packs each prove only their own criteria.
+      # The batch run seals one pack covering every member. Record its id: the
+      # per-member testmd packs each prove only their own criteria, and a
+      # merged pack cannot be read by `cover` at all.
       - name: Record batch evidence pack
+        id: batch
         if: always()
         shell: bash
         run: |
-          if [ ! -s testrun_output.ndjson ]; then
-            echo "No testrun output to read."
-            exit 0
-          fi
+          [ -s testrun_output.ndjson ] || { echo "No testrun output."; exit 0; }
           batch_id="$(grep -o '{"type":"testrun_summary".*' testrun_output.ndjson \
-            | tail -1 \
-            | jq -r '.execution.evidence_id // .execution.id // empty' 2>/dev/null || true)"
+            | tail -1 | jq -r '.execution.evidence_id // .execution.id // empty' 2>/dev/null || true)"
           if [ -n "$batch_id" ] && [ -f ".testmuai/evidence/${batch_id}.evidence" ]; then
-            echo "BATCH_PACK=.testmuai/evidence/${batch_id}.evidence" >> "$GITHUB_ENV"
-            echo "Batch pack: .testmuai/evidence/${batch_id}.evidence"
+            echo "batch_pack=${batch_id}" >> "$GITHUB_OUTPUT"
+            echo "Batch pack: ${batch_id}.evidence"
           else
-            echo "Could not resolve the batch pack id; coverage will fall back."
+            echo "Could not resolve the batch pack id; Phase 5 will fall back."
           fi
-
-      - name: Show evidence files
+      - name: Upload run outputs
         if: always()
-        run: |
-          echo "Evidence generated under .testmuai/evidence/"
-          find .testmuai/evidence -maxdepth 2 -type f -print 2>/dev/null || true
-
-      - name: Validate evidence packs
-        if: always()
-        shell: bash
-        run: |
-          shopt -s nullglob
-          packs=(.testmuai/evidence/*.evidence)
-
-          if [ ${#packs[@]} -eq 0 ]; then
-            echo "::error::No .evidence pack was generated."
-            exit 1
-          fi
-
-          validation_failed=0
-
-          for pack in "${packs[@]}"; do
-            echo "Validating $pack"
-            kane-cli evidence validate "$pack" --json || validation_failed=1
-          done
-
-          if [ "$validation_failed" -ne 0 ]; then
-            echo "::error::One or more evidence packs failed validation."
-            exit 1
-          fi
-
-      # One sealed archive for distribution. Note this pack is NOT usable for
-      # coverage - merging does not carry coverage/usecases.yaml through.
-      - name: Merge evidence packs
-        if: always()
-        shell: bash
-        run: |
-          shopt -s nullglob
-          packs=(.testmuai/evidence/*.evidence)
-          merged=".testmuai/evidence/merged-${{ github.run_id }}.evidence"
-
-          if [ ${#packs[@]} -gt 1 ]; then
-            kane-cli evidence merge "${packs[@]}" \
-              --run-id "${{ github.run_id }}" \
-              --out "$merged"
-            echo "Merged ${#packs[@]} packs into $merged"
-          elif [ ${#packs[@]} -eq 1 ]; then
-            cp "${packs[0]}" "$merged"
-            echo "Single pack copied to $merged"
-          else
-            echo "No packs to merge."
-          fi
-
-      # Two-axis coverage: depth proven by the evidence pack, completeness owed
-      # by the committed .context/ graph. This is the last step of the
-      # lifecycle the README advertises, so it runs even when tests fail.
-      #
-      # Read the BATCH pack, never the merged one: `evidence merge` does not
-      # carry coverage/usecases.yaml through, so `cover` on a merged pack fails
-      # with "carries no coverage/usecases.yaml".
-      - name: Coverage report
-        if: always()
-        shell: bash
-        run: |
-          shopt -s nullglob
-          pack="${BATCH_PACK:-}"
-
-          if [ -z "$pack" ] || [ ! -f "$pack" ]; then
-            # Fall back to the newest pack that is not a merged one.
-            newest=""
-            for candidate in .testmuai/evidence/*.evidence; do
-              case "$(basename "$candidate")" in
-                merged-*) continue ;;
-              esac
-              if [ -z "$newest" ] || [ "$candidate" -nt "$newest" ]; then
-                newest="$candidate"
-              fi
-            done
-            pack="$newest"
-          fi
-
-          if [ -z "$pack" ]; then
-            echo "No evidence pack available - skipping coverage."
-            exit 0
-          fi
-
-          echo "Coverage from $pack"
-          kane-cli cover --from "$pack" --json > coverage.json || true
-          kane-cli cover --from "$pack" | tee coverage.txt || true
-
-          if [ ! -s coverage.json ]; then
-            echo "::warning::cover produced no JSON for $pack"
-          else
-            cat coverage.json
-          fi
-
-      - name: Summarise results
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-run
+          path: |
+            .testmuai/evidence/
+            .testmuai/tests/**/Result.md
+            .testmuai/tests/output-*/
+            testrun_output.ndjson
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Phase 3 summary
         if: always()
         shell: bash
         run: |
           shopt -s nullglob
           results=(.testmuai/tests/output-*/Result.md)
-
           {
-            echo "## Twilio assurance run"
+            echo "## Phase 3 - Run"
             echo
-
             if [ ${#results[@]} -eq 0 ]; then
               echo "No \`Result.md\` was produced."
             else
-              echo "### Execution"
-              echo
               echo "| Test | Status | Duration |"
               echo "| --- | --- | --- |"
               for result in "${results[@]}"; do
-                name="$(basename "$(dirname "$result")")"
-                name="${name#output-}"
-                # Read the YAML frontmatter Kane CLI writes at the top of Result.md.
+                name="$(basename "$(dirname "$result")")"; name="${name#output-}"
                 status="$(awk -F': *' '/^status:/ { print $2; exit }' "$result")"
                 duration="$(awk -F': *' '/^duration_s:/ { print $2 "s"; exit }' "$result")"
                 echo "| $name | ${status:-unknown} | ${duration:-n/a} |"
               done
-              echo
             fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
+  # ── Phase 4 ───────────────────────────────────────────────────────────────
+  evidence:
+    name: "Phase 4 - Evidence: Validate and Seal"
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
+      - name: Download evidence from earlier phases
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: evidence-*
+          path: incoming
+          merge-multiple: true
+      - name: Gather packs
+        shell: bash
+        run: |
+          mkdir -p .testmuai/evidence
+          find incoming -name '*.evidence' -exec cp -n {} .testmuai/evidence/ \; 2>/dev/null || true
+          echo "Packs gathered:"
+          ls -la .testmuai/evidence/ || true
+      - name: Validate evidence packs
+        shell: bash
+        run: |
+          shopt -s nullglob
+          packs=(.testmuai/evidence/*.evidence)
+          if [ ${#packs[@]} -eq 0 ]; then
+            echo "::error::No .evidence pack was generated."
+            exit 1
+          fi
+          validation_failed=0
+          for pack in "${packs[@]}"; do
+            echo "Validating $pack"
+            kane-cli evidence validate "$pack" --json || validation_failed=1
+          done
+          [ "$validation_failed" -eq 0 ] || { echo "::error::One or more evidence packs failed validation."; exit 1; }
+      # One sealed archive for distribution. NOT usable for coverage - merging
+      # does not carry coverage/usecases.yaml through.
+      - name: Merge evidence packs
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          packs=()
+          for p in .testmuai/evidence/*.evidence; do
+            case "$(basename "$p")" in merged-*) continue;; esac
+            packs+=("$p")
+          done
+          merged=".testmuai/evidence/merged-${{ github.run_id }}.evidence"
+          if [ ${#packs[@]} -gt 1 ]; then
+            kane-cli evidence merge "${packs[@]}" --run-id "${{ github.run_id }}" --out "$merged"
+            echo "Merged ${#packs[@]} packs into $merged"
+          elif [ ${#packs[@]} -eq 1 ]; then
+            cp "${packs[0]}" "$merged"; echo "Single pack copied to $merged"
+          else
+            echo "No packs to merge."
+          fi
+      - name: Upload merged evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-merged
+          path: .testmuai/evidence/merged-*.evidence
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Phase 4 summary
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          {
+            echo "## Phase 4 - Evidence"
+            echo
+            echo "| Pack | Bytes |"
+            echo "| --- | --- |"
+            for p in .testmuai/evidence/*.evidence; do
+              echo "| $(basename "$p") | $(wc -c < "$p") |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Phase 5 ───────────────────────────────────────────────────────────────
+  cover:
+    name: "Phase 5 - Cover: Prove and Gate"
+    needs: [run, evidence]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Checkout brings .context/ - `cover` needs the live graph for the
+      # completeness axis.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
+      - name: Download run evidence
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: evidence-run
+          path: incoming
+      - name: Gather packs
+        shell: bash
+        run: |
+          mkdir -p .testmuai/evidence
+          find incoming -name '*.evidence' -exec cp -n {} .testmuai/evidence/ \; 2>/dev/null || true
+          ls -la .testmuai/evidence/ || true
+      # Read the BATCH pack, never a merged one: `evidence merge` does not carry
+      # coverage/usecases.yaml through, and per-member packs prove only their
+      # own criteria.
+      - name: Coverage report
+        shell: bash
+        env:
+          BATCH_ID: ${{ needs.run.outputs.batch_pack }}
+        run: |
+          shopt -s nullglob
+          pack=""
+          if [ -n "$BATCH_ID" ] && [ -f ".testmuai/evidence/${BATCH_ID}.evidence" ]; then
+            pack=".testmuai/evidence/${BATCH_ID}.evidence"
+          else
+            newest=""
+            for candidate in .testmuai/evidence/*.evidence; do
+              case "$(basename "$candidate")" in merged-*) continue;; esac
+              if [ -z "$newest" ] || [ "$candidate" -nt "$newest" ]; then newest="$candidate"; fi
+            done
+            pack="$newest"
+            echo "::warning::Falling back to $pack - coverage may reflect one member only."
+          fi
+          [ -n "$pack" ] || { echo "No evidence pack available - skipping coverage."; exit 0; }
+          echo "Coverage from $pack"
+          kane-cli cover --from "$pack" --json > coverage.json || true
+          kane-cli cover --from "$pack" | tee coverage.txt || true
+          if [ ! -s coverage.json ]; then
+            echo "::warning::cover produced no JSON for $pack"
+          else
+            cat coverage.json
+          fi
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.json
+            coverage.txt
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Phase 5 summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Phase 5 - Cover"
+            echo
             if [ -s coverage.json ]; then
-              echo "### Coverage"
+              echo "### Depth - proven by this run"
               echo
-              echo "| Use case | Status | % | ACs covered | passed | failed |"
+              echo "| Use case | Status | % | ACs | passed | failed |"
               echo "| --- | --- | --- | --- | --- | --- |"
               jq -r '.depth[]? | "| \(.title) | \(.status) | \(.pct)% | \(.acs.covered)/\(.acs.total) | \(.acs.passed) | \(.acs.failed) |"' coverage.json 2>/dev/null || true
               echo
               gaps="$(jq -r '[.completeness[]?] | length' coverage.json 2>/dev/null || echo 0)"
+              echo "### Completeness - still owed by the graph"
+              echo
               if [ "${gaps:-0}" -gt 0 ]; then
-                echo "<details><summary>Completeness gaps (${gaps})</summary>"
-                echo
                 echo "| Ref | Gap |"
                 echo "| --- | --- |"
                 jq -r '.completeness[]? | "| \(.ref) | \(.kind) |"' coverage.json 2>/dev/null || true
-                echo
-                echo "</details>"
-                echo
+              else
+                echo "No outstanding gaps."
               fi
-            fi
-
-            if [ -s authoring_links.tsv ]; then
-              echo "### Test Manager"
-              echo
-              echo "| Test | Link |"
-              echo "| --- | --- |"
-              while IFS=$'\t' read -r n l; do
-                echo "| $n | [open]($l) |"
-              done < authoring_links.tsv
+            else
+              echo "No coverage produced."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload Kane CLI evidence
-        if: always()
-        uses: actions/upload-artifact@v4
+  # ── Phase 6 ───────────────────────────────────────────────────────────────
+  maintain:
+    name: "Phase 6 - Maintain: Check Suite Drift"
+    needs: cover
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          name: kane-cli-evidence
-          path: |
-            .testmuai/evidence/
-            .testmuai/tests/**/Result.md
-            .testmuai/tests/output-*/
-            coverage.json
-            coverage.txt
-            authoring_links.tsv
-            testrun_output.ndjson
-          if-no-files-found: warn
-          retention-days: 30
+          node-version: 20
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-kane-cli
+          restore-keys: ${{ runner.os }}-npm-
+      - name: Install Kane CLI
+        run: npm install -g @testmuai/kane-cli
+      - name: Authenticate with TestMu AI
+        env:
+          LT_USERNAME: ${{ secrets.LT_USERNAME }}
+          LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+        run: kane-cli login --username "$LT_USERNAME" --access-key "$LT_ACCESS_KEY"
+      # Reporting only. `maintain reconcile` needs a CHANGED source document and
+      # stages its proposals for human verdict, so it is not run per-push here -
+      # requirements-drift.yml handles that when requirements/ changes.
+      - name: Report source freshness
+        shell: bash
+        run: |
+          kane-cli context list --type source 2>&1 | tee sources.txt || true
+      - name: Phase 6 summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Phase 6 - Maintain"
+            echo
+            if [ -s sources.txt ]; then
+              echo '```'
+              grep -v 'Update available' sources.txt | sed '/^$/d'
+              echo '```'
+              echo
+            fi
+            echo "A source marked \`stale\` means the committed suite no longer matches its"
+            echo "requirement document. Reconciling is a human action:"
+            echo
+            echo '```bash'
+            echo 'kane-cli maintain reconcile --from <new-doc> --source-id <id> --plan'
+            echo '```'
+            echo
+            echo "On a pull request that touches \`requirements/\`, the"
+            echo "\`requirements-drift.yml\` workflow runs that plan automatically."
+          } >> "$GITHUB_STEP_SUMMARY"
