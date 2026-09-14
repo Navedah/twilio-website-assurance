@@ -173,14 +173,32 @@ jobs:
         run: |
           shopt -s nullglob
           : > authoring_links.tsv
-          failed=0
+          published=0
+          testfail=0
           for test_file in .testmuai/tests/*_test.md; do
             echo "--- $test_file"
-            kane-cli testmd run "$test_file" --headless --agent 2>&1 | tee /tmp/out.txt || failed=1
+            kane-cli testmd run "$test_file" --headless --agent 2>&1 | tee /tmp/out.txt || testfail=$((testfail+1))
             link=$(grep -oE 'https://[^ "]*test-manager[^ "]*' /tmp/out.txt | head -1 || true)
-            [ -n "$link" ] && printf '%s\t%s\n' "$(basename "$test_file")" "$link" >> authoring_links.tsv
+            if [ -n "$link" ]; then
+              printf '%s\t%s\n' "$(basename "$test_file")" "$link" >> authoring_links.tsv
+              published=$((published+1))
+            fi
           done
-          exit $failed
+
+          echo "Published $published case(s); $testfail member(s) failed their assertions."
+
+          # This phase owns PUBLISHING, not the test verdict. A member that fails
+          # its assertions still published successfully, and Phase 3 reports the
+          # authoritative pass/fail for the suite. Only a publishing failure
+          # fails this job.
+          if [ "$published" -eq 0 ]; then
+            echo "::error::No test case reached Test Manager."
+            exit 1
+          fi
+          if [ "$testfail" -gt 0 ]; then
+            echo "::warning::${testfail} member(s) failed during publish-replay - see Phase 3 for the verdict."
+          fi
+          exit 0
       - name: Upload publish evidence
         if: always()
         uses: actions/upload-artifact@v4
